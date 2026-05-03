@@ -1,0 +1,100 @@
+1 Vivi Ornitier (FIN) 570 *F*
+1 Alchemist's Gambit (VOW) 140
+1 An Offer You Can't Refuse (FIC) 267
+1 Ancient Tomb (EOS) 1
+1 Arid Mesa (SPG) 109
+1 Blazing Shoal (PLST) BOK-96
+1 Bloodstained Mire (MH3) 352
+1 Boomerang Basics (TLA) 46a
+1 Cave-In (MMQ) 180
+1 Cavern of Souls (LCI) 345
+1 Chain of Vapor (SLD) 2295
+1 Chrome Mox (MPS) 9 *F*
+1 Commandeer (OTP) 9
+1 Crowd's Favor (M15) 138
+1 Curiosity (WOT) 17
+1 Daze (MP2) 12 *F*
+1 Deflecting Swat (TLE) 311
+1 Disrupting Shoal (UMA) 51
+1 Dizzy Spell (RAV) 43
+1 Drift of Phantasms (RAV) 46
+1 Fierce Guardianship (TLE) 307
+1 Fiery Islet (WHO) 278
+1 Final Fortune (SLD) 1956
+1 Flooded Strand (MH3) 353
+1 Flusterstorm (MB2) 163
+1 Force of Will (2XM) 340
+1 Gamble (TLE) 312
+1 Gemstone Caverns (EOS) 61
+1 Gitaxian Probe (MB2) 28
+1 Grim Monolith (PRM) 61567 *F*
+1 Gut Shot (NPH) 86
+1 Hullbreaker Horror (SLD) 2321 *F*
+1 Hydroelectric Specimen / Hydroelectric Laboratory (MH3) 240 *F*
+1 Imperial Recruiter (PRM) 91277
+1 Intuition (TMP) 70
+1 Invert / Invent (GRN) 228
+1 Island (SLD) 2145 *F*
+1 Jeska's Will (CLB) 799
+1 Jeweled Amulet (ICE) 326
+1 Last Chance (DMR) 435
+1 Lion's Eye Diamond (MIR) 307
+1 Lodestone Bauble (ALL) 122
+1 Lotus Petal (PLST) TMP-294
+1 Mana Vault (2X2) 394
+1 Mental Misstep (MB2) 30
+1 Merchant Scroll (J18) 1 *F*
+1 Misdirection (PLST) DDT-15
+1 Mishra's Bauble (MB2) 97
+1 Misty Rainforest (SPG) 111
+1 Mogg Salvage (MH2) 282
+1 Mountain (SPM) 192
+1 Mox Amber (DOM) 224
+1 Mox Diamond (STH) 138
+1 Mox Opal (MPS) 19 *F*
+1 Multiversal Passage (SPM) 180
+1 Mystic Remora (SLD) 406
+1 Mystical Tutor (TLE) 308
+1 Niv-Mizzet, Visionary (FDN) 123
+1 Ophidian Eye (PLST) TSP-70
+1 Pact of Negation (MP2) 16 *F*
+1 Paradise Mantle (SLD) 1236 *F*
+1 Pinnacle Monk / Mystic Peak (MH3) 246
+1 Polluted Delta (MH3) 356
+1 Prismatic Vista (SPG) 38
+1 Pyroblast (MB2) 198
+1 Pyrokinesis (ATH) 47
+1 Quicksilver Elemental (MRD) 47
+1 Ragavan, Nimble Pilferer (SLP) 2 *F*
+1 Redirect Lightning (TLA) 343
+1 Repeal (RVR) 60 *F*
+1 Rhystic Study (WOT) 71
+1 Rite of Flame (PLST) SS3-7
+1 Sandstone Needle (MMQ) 326
+1 Saprazzan Skerry (MMQ) 328
+1 Scalding Tarn (SPG) 112
+1 Sea Gate Restoration / Sea Gate, Reborn (ZNR) 333
+1 Secret Identity (OM1) 42
+1 Shatterskull Smashing / Shatterskull, the Hammer Pass (ZNR) 161 *F*
+1 Simian Spirit Guide (SLD) 1548★ *F*
+1 Sink into Stupor / Soporific Springs (MH3) 241
+1 Snapback (TSR) 87
+1 Sol Ring (SLD) 249
+1 Solve the Equation (SLD) 1022
+1 Springleaf Drum (LRW) 261
+1 Steam Vents (CLU) 280 *F*
+1 Strike It Rich (MH2) 143
+1 Sundering Eruption / Volcanic Fissure (MH3) 248
+1 Swan Song (SLD) 1591
+1 Tandem Lookout (PLST) MM3-53
+1 Thran Portal (DMU) 259
+1 Thunderclap (MMQ) 219
+1 Thundering Falls (MKM) 331
+1 Twisted Image (PLST) SOM-50
+1 Urza's Bauble (MB2) 237
+1 Vexing Bauble (MH3) 212
+1 Virtue of Courage / Embereth Blaze (WOE) 282
+1 Volcanic Island (3ED) 291
+1 Warrior's Oath (2X2) 130
+1 Wild Ride (TDM) 132
+1 Wooded Foothills (MH3) 361

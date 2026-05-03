@@ -1,0 +1,101 @@
+card_id,name,mana_cost,mv,colors,pip_u,pip_r,generic_mana,x_in_cost,card_types,is_noncreature_spell,can_play_as_land,land_enters_tapped,land_mana_mode,land_limited_uses,alt_costs,produces_mana,mana_source_type,mana_colors,mana_amount,mana_timing,mana_condition,requires_tap,requires_sacrifice,requires_discard,requires_exile,requires_creature
+1,Vivi Ornitier,{1}{U}{R},3,UR,1,1,1,false,Creature,false,false,,none,,,true,creature_ability,UR,dynamic,conditional,own_turn_once_per_turn_amount_equals_power,false,false,false,false,false
+2,Alchemist's Gambit,{1}{R}{R},3,R,0,2,1,false,Sorcery,true,false,,none,,alt:cleave_4RRR,false,none,none,,none,,false,false,false,false,false
+3,An Offer You Can't Refuse,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+4,Ancient Tomb,,0,,0,0,0,false,Land,false,true,false,fixed,,,true,land,C,2,repeatable,,true,false,false,false,false
+5,Arid Mesa,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_mountain_or_plains;deck_fetchable_colors_UR,true,true,false,false,false
+6,Blazing Shoal,{X}{R}{R},2,R,0,2,0,true,Instant,true,false,,none,,alt_x:pitch_red_mv,false,none,none,,none,,false,false,false,false,false
+7,Bloodstained Mire,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_swamp_or_mountain;deck_fetchable_colors_UR,true,true,false,false,false
+8,Boomerang Basics,{U},1,U,1,0,0,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+9,Cave-In,{3}{R}{R},5,R,0,2,3,false,Sorcery,true,false,,none,,free:pitch_red,false,none,none,,none,,false,false,false,false,false
+10,Cavern of Souls,,0,,0,0,0,false,Land,false,true,false,conditional,,,true,land,any_creature_or_C,1,repeatable,choose_creature_type;color_only_for_creature_spells,true,false,false,false,false
+11,Chain of Vapor,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+12,Chrome Mox,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,imprinted_card_color,1,repeatable,imprint_nonartifact_nonland_colored_card,true,false,false,false,false
+13,Commandeer,{5}{U}{U},7,U,2,0,5,false,Instant,true,false,,none,,free:pitch_blue_blue,false,none,none,,none,,false,false,false,false,false
+14,Crowd's Favor,{R},1,R,0,1,0,false,Instant,true,false,,none,,cost_reduction:convoke_creature_tap,false,none,none,,none,,false,false,false,false,false
+15,Curiosity,{U},1,U,1,0,0,false,Enchantment,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+16,Daze,{1}{U},2,U,1,0,1,false,Instant,true,false,,none,,free:return_island,false,none,none,,none,,false,false,false,false,false
+17,Deflecting Swat,{2}{R},3,R,0,1,2,false,Instant,true,false,,none,,free:commander_controlled,false,none,none,,none,,false,false,false,false,false
+18,Disrupting Shoal,{X}{U}{U},2,U,2,0,0,true,Instant,true,false,,none,,alt_x:pitch_blue_mv,false,none,none,,none,,false,false,false,false,false
+19,Dizzy Spell,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+20,Drift of Phantasms,{2}{U},3,U,1,0,2,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+21,Fierce Guardianship,{2}{U},3,U,1,0,2,false,Instant,true,false,,none,,free:commander_controlled,false,none,none,,none,,false,false,false,false,false
+22,Fiery Islet,,0,,0,0,0,false,Land,false,true,false,choice,,,true,land,UR,1,repeatable,,true,false,false,false,false
+23,Final Fortune,{R}{R},2,R,0,2,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+24,Flooded Strand,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_plains_or_island;deck_fetchable_colors_UR,true,true,false,false,false
+25,Flusterstorm,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+26,Force of Will,{3}{U}{U},5,U,2,0,3,false,Instant,true,false,,none,,free:pitch_blue,false,none,none,,none,,false,false,false,false,false
+27,Gamble,{R},1,R,0,1,0,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+28,Gemstone Caverns,,0,,0,0,0,false,Land,false,true,false,conditional,,,true,land,any_or_C,1,repeatable,any_color_only_with_luck_counter,true,false,false,false,false
+29,Gitaxian Probe,{U/P},1,U,1,0,0,false,Sorcery,true,false,,none,,free:pay_life_ignored,false,none,none,,none,,false,false,false,false,false
+30,Grim Monolith,{2},2,,0,0,2,false,Artifact,true,false,,none,,,true,artifact,C,3,conditional,does_not_untap_normally,true,false,false,false,false
+31,Gut Shot,{R/P},1,R,0,1,0,false,Instant,true,false,,none,,free:pay_life_ignored,false,none,none,,none,,false,false,false,false,false
+32,Hullbreaker Horror,{5}{U}{U},7,U,2,0,5,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+33,Hydroelectric Specimen / Hydroelectric Laboratory,{2}{U},3,U,1,0,2,false,Creature,false,true,false,fixed,,,true,land,U,1,repeatable,,true,false,false,false,false
+34,Imperial Recruiter,{2}{R},3,R,0,1,2,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+35,Intuition,{2}{U},3,U,1,0,2,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+36,Invert / Invent,{U/R}//{4}{U/R}{U/R},7,UR,3,3,4,false,Instant,true,false,,none,,split_face:invent_4_hybridUR_hybridUR,false,none,none,,none,,false,false,false,false,false
+37,Island,,0,,0,0,0,false,Land,false,true,false,fixed,,,true,land,U,1,repeatable,,true,false,false,false,false
+38,Jeska's Will,{2}{R},3,R,0,1,2,false,Sorcery,true,false,,none,,,true,spell,R,dynamic,ritual,amount_equals_target_opponent_hand_size,false,false,false,false,false
+39,Jeweled Amulet,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,stored_color,1,delayed,requires_prior_charge_with_mana,true,false,false,false,false
+40,Last Chance,{R}{R},2,R,0,2,0,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+41,Lion's Eye Diamond,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,any_one_color,3,one_shot,,false,true,true,false,false
+42,Lodestone Bauble,{0},0,,0,0,0,false,Artifact,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+43,Lotus Petal,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,any,1,one_shot,,false,true,false,false,false
+44,Mana Vault,{1},1,,0,0,1,false,Artifact,true,false,,none,,,true,artifact,C,3,conditional,does_not_untap_normally,true,false,false,false,false
+45,Mental Misstep,{U/P},1,U,1,0,0,false,Instant,true,false,,none,,free:pay_life_ignored,false,none,none,,none,,false,false,false,false,false
+46,Merchant Scroll,{1}{U},2,U,1,0,1,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+47,Misdirection,{3}{U}{U},5,U,2,0,3,false,Instant,true,false,,none,,free:pitch_blue,false,none,none,,none,,false,false,false,false,false
+48,Mishra's Bauble,{0},0,,0,0,0,false,Artifact,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+49,Misty Rainforest,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_forest_or_island;deck_fetchable_colors_UR,true,true,false,false,false
+50,Mogg Salvage,{2}{R},3,R,0,1,2,false,Instant,true,false,,none,,free:opponent_controls_island_and_you_control_mountain,false,none,none,,none,,false,false,false,false,false
+51,Mountain,,0,,0,0,0,false,Land,false,true,false,fixed,,,true,land,R,1,repeatable,,true,false,false,false,false
+52,Mox Amber,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,legendary_permanent_colors,1,repeatable,control_legendary_creature_or_planeswalker,true,false,false,false,false
+53,Mox Diamond,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,any,1,repeatable,discard_land_on_etb,true,false,false,false,false
+54,Mox Opal,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,any,1,repeatable,metalcraft,true,false,false,false,false
+55,Multiversal Passage,,0,,0,0,0,false,Land,false,true,false,choice,,,true,land,UR,1,repeatable,choose_basic_land_type;life_payment_ignored,true,false,false,false,false
+56,Mystic Remora,{U},1,U,1,0,0,false,Enchantment,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+57,Mystical Tutor,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+58,"Niv-Mizzet, Visionary",{4}{U}{R},6,UR,1,1,4,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+59,Ophidian Eye,{2}{U},3,U,1,0,2,false,Enchantment,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+60,Pact of Negation,{0},0,U,0,0,0,false,Instant,true,false,,none,,free:delayed_upkeep_cost,false,none,none,,none,,false,false,false,false,false
+61,Paradise Mantle,{0},0,,0,0,0,false,Artifact,true,false,,none,,,true,artifact,any,1,repeatable,equipped_creature_taps_for_mana,true,false,false,false,true
+62,Pinnacle Monk / Mystic Peak,{3}{R}{R},5,R,0,2,3,false,Creature,false,true,false,fixed,,,true,land,R,1,repeatable,,true,false,false,false,false
+63,Polluted Delta,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_island_or_swamp;deck_fetchable_colors_UR,true,true,false,false,false
+64,Prismatic Vista,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_basic;deck_basic_colors_UR,true,true,false,false,false
+65,Pyroblast,{R},1,R,0,1,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+66,Pyrokinesis,{4}{R}{R},6,R,0,2,4,false,Instant,true,false,,none,,free:pitch_red,false,none,none,,none,,false,false,false,false,false
+67,Quicksilver Elemental,{3}{U}{U},5,U,2,0,3,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+68,"Ragavan, Nimble Pilferer",{R},1,R,0,1,0,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+69,Redirect Lightning,{R},1,R,0,1,0,false,Instant,true,false,,none,,additional_cost:pay_5_life_ignored_or_pay_2,false,none,none,,none,,false,false,false,false,false
+70,Repeal,{X}{U},1,U,1,0,0,true,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+71,Rhystic Study,{2}{U},3,U,1,0,2,false,Enchantment,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+72,Rite of Flame,{R},1,R,0,1,0,false,Sorcery,true,false,,none,,,true,spell,R,2,ritual,plus_R_for_each_rite_of_flame_in_graveyards,false,false,false,false,false
+73,Sandstone Needle,,0,,0,0,0,false,Land,false,true,true,limited,2,,true,land,R,2,repeatable,depletion_counter,true,false,false,false,false
+74,Saprazzan Skerry,,0,,0,0,0,false,Land,false,true,true,limited,2,,true,land,U,2,repeatable,depletion_counter,true,false,false,false,false
+75,Scalding Tarn,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_island_or_mountain;deck_fetchable_colors_UR,true,true,false,false,false
+76,"Sea Gate Restoration / Sea Gate, Reborn",{4}{U}{U}{U},7,U,3,0,4,false,Sorcery,true,true,false,fixed,,,true,land,U,1,repeatable,life_payment_ignored,true,false,false,false,false
+77,Secret Identity,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+78,"Shatterskull Smashing / Shatterskull, the Hammer Pass",{X}{R}{R},2,R,0,2,0,true,Sorcery,true,true,false,fixed,,,true,land,R,1,repeatable,life_payment_ignored,true,false,false,false,false
+79,Simian Spirit Guide,{2}{R},3,R,0,1,2,false,Creature,false,false,,none,,,true,exile_from_hand,R,1,one_shot,,false,false,false,true,false
+80,Sink into Stupor / Soporific Springs,{1}{U}{U},3,U,2,0,1,false,Instant,true,true,false,fixed,,,true,land,U,1,repeatable,life_payment_ignored,true,false,false,false,false
+81,Snapback,{1}{U},2,U,1,0,1,false,Instant,true,false,,none,,free:pitch_blue,false,none,none,,none,,false,false,false,false,false
+82,Sol Ring,{1},1,,0,0,1,false,Artifact,true,false,,none,,,true,artifact,C,2,repeatable,,true,false,false,false,false
+83,Solve the Equation,{2}{U},3,U,1,0,2,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+84,Springleaf Drum,{1},1,,0,0,1,false,Artifact,true,false,,none,,,true,artifact,any,1,repeatable,tap_untapped_creature_you_control,true,false,false,false,true
+85,Steam Vents,,0,,0,0,0,false,Land,false,true,false,choice,,,true,land,UR,1,repeatable,life_payment_ignored,true,false,false,false,false
+86,Strike It Rich,{R},1,R,0,1,0,false,Sorcery,true,false,,none,,alt:flashback_2R,true,spell,any,1,delayed,creates_treasure,false,false,false,false,false
+87,Sundering Eruption / Volcanic Fissure,{2}{R},3,R,0,1,2,false,Sorcery,true,true,false,fixed,,,true,land,R,1,repeatable,life_payment_ignored,true,false,false,false,false
+88,Swan Song,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+89,Tandem Lookout,{2}{U},3,U,1,0,2,false,Creature,false,false,,none,,,false,none,none,,none,,false,false,false,false,false
+90,Thran Portal,,0,,0,0,0,false,Land,false,true,conditional,choice,,,true,land,UR,1,repeatable,choose_basic_land_type;enters_tapped_unless_two_or_fewer_other_lands;damage_ignored,true,false,false,false,false
+91,Thunderclap,{2}{R},3,R,0,1,2,false,Instant,true,false,,none,,free:sacrifice_mountain,false,none,none,,none,,false,false,false,false,false
+92,Thundering Falls,,0,,0,0,0,false,Land,false,true,true,choice,,,true,land,UR,1,repeatable,,true,false,false,false,false
+93,Twisted Image,{U},1,U,1,0,0,false,Instant,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+94,Urza's Bauble,{0},0,,0,0,0,false,Artifact,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+95,Vexing Bauble,{1},1,,0,0,1,false,Artifact,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+96,Virtue of Courage / Embereth Blaze,{3}{R}{R},5,R,0,2,3,false,Enchantment,true,false,,none,,adventure:Embereth_Blaze_1R,false,none,none,,none,,false,false,false,false,false
+97,Volcanic Island,,0,,0,0,0,false,Land,false,true,false,choice,,,true,land,UR,1,repeatable,,true,false,false,false,false
+98,Warrior's Oath,{R}{R},2,R,0,2,0,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false
+99,Wild Ride,{R},1,R,0,1,0,false,Instant,true,false,,none,,alt:harmonize_4R_from_graveyard_tap_up_to_one_creature,false,none,none,,none,,false,false,false,false,false
+100,Wooded Foothills,,0,,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_forest_or_mountain;deck_fetchable_colors_UR,true,true,false,false,false

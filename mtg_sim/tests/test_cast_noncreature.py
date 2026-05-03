@@ -1,0 +1,64 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+DATA_DIR = Path(__file__).parent.parent.parent
+
+from mtg_sim.sim.cards import load_cards, load_decklist
+from mtg_sim.sim.mana import ManaPool
+from mtg_sim.sim.runner import RunConfig, simulate_run, _build_initial_state
+from mtg_sim.sim.resolver import resolve_action, draw_cards
+from mtg_sim.sim.actions import Action, CostBundle, ManaCost, CAST_SPELL, RISK_SAFE
+from random import Random
+
+
+def _load():
+    load_cards(str(DATA_DIR / "mtg_sim_card_data_v1.csv"))
+    return load_decklist(str(DATA_DIR / "testdecklist.txt"))
+
+
+def test_cast_free_noncreature_draws_three():
+    cards = _load()
+    hand = ["Lotus Petal", "Gitaxian Probe"]
+    cfg = RunConfig(seed=1, starting_hand=hand, starting_floating_mana=ManaPool(U=1))
+    rng = Random(1)
+    state = _build_initial_state(cfg, cards, rng)
+    # Fill library so we can draw
+    draw_cards(state, 3)  # initial curiosity
+
+    hand_before = len(state.hand)
+    action = Action(
+        action_type=CAST_SPELL,
+        source_card="Gitaxian Probe",
+        description="Cast Gitaxian Probe (free)",
+        costs=CostBundle(),
+        risk_level=RISK_SAFE,
+        alt_cost_type="pay_life",
+    )
+    resolve_action(state, action)
+
+    # Gitaxian Probe is noncreature → should draw 3 from Curiosity
+    assert state.noncreature_spells_cast == 1
+    assert len(state.hand) == hand_before - 1 + 3  # probe removed, 3 drawn
+
+
+def test_cast_increments_spell_count():
+    cards = _load()
+    hand = ["Lotus Petal"]
+    cfg = RunConfig(seed=1, starting_hand=hand, starting_floating_mana=ManaPool())
+    rng = Random(1)
+    state = _build_initial_state(cfg, cards, rng)
+    draw_cards(state, 3)
+
+    action = Action(
+        action_type=CAST_SPELL,
+        source_card="Lotus Petal",
+        description="Cast Lotus Petal",
+        costs=CostBundle(),
+        risk_level=RISK_SAFE,
+    )
+    resolve_action(state, action)
+    assert state.noncreature_spells_cast == 1
+    assert state.total_spells_cast == 1
+    # Lotus Petal goes to stack
+    assert any(o.card_name == "Lotus Petal" for o in state.stack)
