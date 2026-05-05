@@ -6,12 +6,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from mtg_sim.sim.cards import load_cards, load_decklist
+from mtg_sim.sim.cards import load_card_library, build_active_deck
 from mtg_sim.sim.mana import ManaPool
 from mtg_sim.sim.runner import RunConfig, simulate_run
 from mtg_sim.sim.metrics import aggregate, format_metrics
 
 DATA_DIR = Path(__file__).parent.parent.parent
+DEFAULT_LIBRARY = DATA_DIR / "card_library.csv"
 
 
 def main() -> None:
@@ -23,25 +24,14 @@ def main() -> None:
     parser.add_argument("--mana-c", type=int, default=0)
     parser.add_argument("--curiosity-count", type=int, default=1)
     parser.add_argument("--jobs", type=int, default=1, help="Parallel workers")
-    parser.add_argument(
-        "--csv", default=str(DATA_DIR / "mtg_sim_card_data_v1.csv")
-    )
-    parser.add_argument(
-        "--decklist", default=str(DATA_DIR / "testdecklist.txt")
-    )
+    parser.add_argument("--deck-ids", nargs="*", type=int, default=None,
+                        help="Card IDs for active deck (default: IDs 2-100)")
     args = parser.parse_args()
 
-    card_db = load_cards(args.csv)
-    all_cards = load_decklist(args.decklist)
+    load_card_library(str(DEFAULT_LIBRARY))
+    active_deck = build_active_deck(args.deck_ids)
 
-    base_config = RunConfig(
-        seed=0,
-        starting_hand=[],
-        starting_floating_mana=ManaPool(U=args.mana_u, R=args.mana_r, C=args.mana_c),
-        curiosity_effect_count=args.curiosity_count,
-        csv_path=args.csv,
-        decklist_path=args.decklist,
-    )
+    base_mana = ManaPool(U=args.mana_u, R=args.mana_r, C=args.mana_c)
 
     print(f"Running {args.runs} simulations... ", end="", flush=True)
 
@@ -55,19 +45,17 @@ def main() -> None:
         ) for i in range(args.runs)]
         with ProcessPoolExecutor(max_workers=args.jobs) as ex:
             results = list(ex.map(_run_one, configs,
-                                  [all_cards] * args.runs))
+                                  [active_deck] * args.runs))
     else:
         results = []
         for i in range(args.runs):
             cfg = RunConfig(
                 seed=args.seed + i,
                 starting_hand=[],
-                starting_floating_mana=ManaPool(
-                    U=args.mana_u, R=args.mana_r, C=args.mana_c
-                ),
+                starting_floating_mana=base_mana,
                 curiosity_effect_count=args.curiosity_count,
             )
-            results.append(simulate_run(cfg, all_cards))
+            results.append(simulate_run(cfg, active_deck))
             if (i + 1) % 100 == 0:
                 print(f"{i+1}...", end="", flush=True)
 

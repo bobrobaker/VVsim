@@ -4,15 +4,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 DATA_DIR = Path(__file__).parent.parent.parent
 
-from mtg_sim.sim.cards import load_cards, load_decklist
+from mtg_sim.sim.cards import load_card_library, build_active_deck
 from mtg_sim.sim.mana import ManaPool
 from mtg_sim.sim.runner import RunConfig, simulate_run
 from mtg_sim.sim.actions import BRICK_NO_ACTIONS, BRICK_NO_USEFUL_ACTIONS
 
 
 def _load():
-    load_cards(str(DATA_DIR / "mtg_sim_card_data_v1.csv"))
-    return load_decklist(str(DATA_DIR / "testdecklist.txt"))
+    load_card_library(str(DATA_DIR / "card_library.csv"))
+    return build_active_deck()
 
 
 def test_empty_hand_no_mana_bricks():

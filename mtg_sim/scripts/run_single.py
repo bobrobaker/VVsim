@@ -6,12 +6,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from mtg_sim.sim.cards import load_cards, load_decklist
+from mtg_sim.sim.cards import load_card_library, build_active_deck
 from mtg_sim.sim.mana import ManaPool
 from mtg_sim.sim.runner import RunConfig, simulate_run
 from mtg_sim.sim.trace import format_trace
 
 DATA_DIR = Path(__file__).parent.parent.parent
+DEFAULT_LIBRARY = DATA_DIR / "card_library.csv"
 
 
 def main() -> None:
@@ -27,21 +28,16 @@ def main() -> None:
                         help="Interactive mode: choose each action manually")
     parser.add_argument("--no-opponent-island", action="store_true",
                         help="Assume opponent does NOT control an island (disables Mogg Salvage free cost)")
-    parser.add_argument(
-        "--csv", default=str(DATA_DIR / "mtg_sim_card_data_v1.csv")
-    )
-    parser.add_argument(
-        "--decklist", default=str(DATA_DIR / "testdecklist.txt")
-    )
+    parser.add_argument("--deck-ids", nargs="*", type=int, default=None,
+                        help="Card IDs for active deck (default: IDs 2-100)")
     args = parser.parse_args()
 
-    card_db = load_cards(args.csv)
-    all_cards = load_decklist(args.decklist)
+    load_card_library(str(DEFAULT_LIBRARY))
+    active_deck = build_active_deck(args.deck_ids)
 
-    # Validate hand
     for c in args.hand:
-        if c not in card_db:
-            print(f"WARNING: '{c}' not found in card database", file=sys.stderr)
+        if c not in {name for name in active_deck}:
+            print(f"WARNING: '{c}' not in active deck", file=sys.stderr)
 
     config = RunConfig(
         seed=args.seed,
@@ -50,11 +46,9 @@ def main() -> None:
         curiosity_effect_count=args.curiosity_count,
         manual_mode=args.manual,
         opponent_controls_island=not args.no_opponent_island,
-        csv_path=args.csv,
-        decklist_path=args.decklist,
     )
 
-    result = simulate_run(config, all_cards)
+    result = simulate_run(config, active_deck)
     print(format_trace(result, show_full=not args.short))
 
 

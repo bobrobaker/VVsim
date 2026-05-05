@@ -29,8 +29,6 @@ class RunConfig:
     library_order: list | None = None
     curiosity_effect_count: int = 1
     jeska_opponent_hand_size: int = 7
-    csv_path: str = ""
-    decklist_path: str = ""
     starting_battlefield: list = field(default_factory=lambda: ["Volcanic Island"])
     # Cards in starting_battlefield that enter tapped (Volcanic Island already tapped because
     # we tapped it for the starting mana floating into the sim).
@@ -61,10 +59,10 @@ class RunResult:
         return self.outcome in (WIN_EXTRA_TURN, WIN_NONCREATURE_SPELL_COUNT)
 
 
-def simulate_run(config: RunConfig, all_card_names: list[str]) -> RunResult:
+def simulate_run(config: RunConfig, active_deck: list[str]) -> RunResult:
     from .state import validate_state
     rng = Random(config.seed)
-    state = _build_initial_state(config, all_card_names, rng)
+    state = _build_initial_state(config, active_deck, rng)
     validate_state(state)
 
     # Capture initial state info before the draw
@@ -207,14 +205,14 @@ def _brick(state: GameState, outcome: str, reason: str, step: int) -> RunResult:
     )
 
 
-def _build_initial_state(config: RunConfig, all_card_names: list[str], rng: Random) -> GameState:
+def _build_initial_state(config: RunConfig, active_deck: list[str], rng: Random) -> GameState:
     vivi = "Vivi Ornitier"
-    remaining = [c for c in all_card_names if c != vivi and c not in config.starting_hand]
+    remaining = [c for c in active_deck if c != vivi and c not in config.starting_hand]
 
     # Remove starting_battlefield cards from the library pool (zone consistency)
     for card_name in config.starting_battlefield:
         assert card_name in remaining, (
-            f"starting_battlefield card '{card_name}' not found in decklist "
+            f"starting_battlefield card '{card_name}' not found in active deck "
             f"(or conflicts with starting_hand / another starting_battlefield entry)"
         )
         remaining.remove(card_name)

@@ -2,6 +2,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 import csv
+import warnings
+
+DEFAULT_ACTIVE_DECK_IDS = list(range(2, 101))
+
+VIVI_CARD_ID = 1
 
 
 @dataclass(frozen=True)
@@ -78,7 +83,9 @@ class CardData:
         return self.name.split(" / ")[0] if "/" in self.name else self.name
 
 
-_CARD_DB: dict[str, CardData] = {}
+# Keyed by name for fast lookup during simulation; also accessible by card_id.
+_CARD_LIBRARY_BY_NAME: dict[str, CardData] = {}
+_CARD_LIBRARY_BY_ID: dict[int, CardData] = {}
 
 
 def _parse_bool(s: str) -> bool:
@@ -92,9 +99,10 @@ def _parse_int(s: str, default: int = 0) -> int:
         return default
 
 
-def load_cards(csv_path: str) -> dict[str, CardData]:
-    global _CARD_DB
-    _CARD_DB = {}
+def load_card_library(csv_path: str) -> dict[str, CardData]:
+    global _CARD_LIBRARY_BY_NAME, _CARD_LIBRARY_BY_ID
+    _CARD_LIBRARY_BY_NAME = {}
+    _CARD_LIBRARY_BY_ID = {}
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -129,40 +137,42 @@ def load_cards(csv_path: str) -> dict[str, CardData]:
                 requires_creature=_parse_bool(row["requires_creature"]),
                 has_flash=_parse_bool(row.get("has_flash", "false")),
             )
-            _CARD_DB[card.name] = card
-    return _CARD_DB
+            _CARD_LIBRARY_BY_NAME[card.name] = card
+            _CARD_LIBRARY_BY_ID[card.card_id] = card
+    return _CARD_LIBRARY_BY_NAME
+
+
+def build_active_deck(card_ids: list[int] | None = None) -> list[str]:
+    """Return card names for the given IDs (default: IDs 2-100).
+
+    Errors if any ID is missing from the card library.
+    Warns if any card has no behavior registered in card_behaviors.
+    """
+    from .card_behaviors import CARD_BEHAVIORS
+
+    if card_ids is None:
+        card_ids = DEFAULT_ACTIVE_DECK_IDS
+
+    names: list[str] = []
+    for cid in card_ids:
+        if cid not in _CARD_LIBRARY_BY_ID:
+            raise ValueError(f"Card ID {cid} not found in card library")
+        names.append(_CARD_LIBRARY_BY_ID[cid].name)
+
+    missing_behavior = [n for n in names if n not in CARD_BEHAVIORS]
+    if missing_behavior:
+        warnings.warn(
+            f"Active deck contains cards with no registered behavior "
+            f"(will use generic rules only): {missing_behavior}",
+            stacklevel=2,
+        )
+
+    return names
 
 
 def get_card(name: str) -> Optional[CardData]:
-    return _CARD_DB.get(name)
+    return _CARD_LIBRARY_BY_NAME.get(name)
 
 
 def get_all_cards() -> dict[str, CardData]:
-    return _CARD_DB
-
-
-def load_decklist(txt_path: str) -> list[str]:
-    """Parse the MTGO/Moxfield-style decklist and return card names (excluding commander)."""
-    names = []
-    with open(txt_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            # Format: "1 Card Name (SET) collector_number *F*"
-            parts = line.split()
-            if not parts:
-                continue
-            try:
-                int(parts[0])
-                name_parts = []
-                for part in parts[1:]:
-                    if part.startswith("("):
-                        break
-                    name_parts.append(part)
-                name = " ".join(name_parts)
-                if name:
-                    names.append(name)
-            except ValueError:
-                continue
-    return names
+    return _CARD_LIBRARY_BY_NAME

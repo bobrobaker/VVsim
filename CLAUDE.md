@@ -53,26 +53,22 @@ Key files:
 
 ## Current Status
 
-Chunks 5–6 complete: all card-specific action generation moved out of `action_generator.py` into `CardBehavior` subclasses.
-
-Sentinel refactor complete:
-- `CardBehavior.generate_actions()` returns `None` by default (delegate to generic scaffolding) or a `list[Action]` to own generation.
-- `owns_action_generation` flag removed entirely from all subclasses.
-- Dispatcher in `action_generator._gen_cast_actions` (line ~142): calls `beh.generate_actions()`, uses result if not None, else falls through to `_gen_normal_and_alt_cast_actions`.
-- Behaviors that override `generate_actions`: TwistedImageBehavior, RepealBehavior, MoggSalvageBehavior, MentalMisstepBehavior, MisdirectionBehavior, SimianSpiritGuideBehavior.
-- `_gen_alt_cost_actions` has no card-name branches; remaining alt-cost tokens are generic.
-- `CardBehavior.generate_pending_actions(state, choice)` handles card-specific pending choices. ChromeMoxBehavior (imprint) and MoxDiamondBehavior (discard) implement it; `_gen_pending_choice_actions` dispatches by `choice.source_card`.
-
 Architecture direction (agreed):
 - `action_generator.py` owns generic scaffolding: iterate zones, enforce timing/stack rules, call behavior hooks.
 - Each card behavior owns both action generation (when/what) and resolution (what happens).
 - Long-term: split into per-card files so each card's full behavior (generation + resolution + tests) can be handed off cleanly. Deferred until individual behaviors grow large enough to warrant it (~half of card behaviors are not well-implemented and will need test coverage first).
 - `None`-sentinel pattern is the hook: any behavior can take ownership of its card's action generation by returning a list from `generate_actions()`.
 
-Known design direction:
-- Manual mode and policy mode should use the same legal action list when possible.
-- Manual/debug output should be readable and show relevant zones/targets.
+Long term todo:
+- card refining: Use docs to describe the intended behavior of each card specific card behavior refining: check unimplemented card tokens
+- policy refining: refactor policy to have weights that are in text editable policy config file, in manual mode when reporting actions for the user to choose also display what the policies system thinks of each choice, if then you choose not the top policy manual mode will prompt you as to why and it will log that in a policy-adjustment log + any relevant info about the state. Then review the policy log with claude to refine policy behavior
+
+Card library / active deck:
+- `card_library.csv` — all cards the sim knows about (ID 1 = Vivi, always present)
+- Active deck = list of card IDs; default is IDs 2–100; configured via `--deck-ids` CLI flag or by passing a list to `build_active_deck()`
+- `cards.py`: `load_card_library()` loads CSV, `build_active_deck(card_ids)` validates IDs and warns on missing behaviors
+- Cards missing from CSV → error; cards missing from `card_behaviors.py` → warning only (generic rules apply)
 
 Next task:
-- Incrementally move remaining card-specific logic from `_gen_normal_and_alt_cast_actions` and `_gen_alt_cost_actions` into behavior `generate_actions()` overrides, one card at a time, with test coverage.
-- Prioritize cards with known behavior gaps (to be enumerated with user).
+- refactor wincon/extra turn cards to use language "terminator" since we'll be adding more items to that conceptual cluster that aren't strictly extra turn spells but we can reasonably assume end the simulation with a win
+- Prep for specific card behavior refining

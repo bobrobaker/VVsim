@@ -6,12 +6,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from mtg_sim.sim.cards import load_cards, load_decklist
+from mtg_sim.sim.cards import load_card_library, build_active_deck
 from mtg_sim.sim.mana import ManaPool
 from mtg_sim.sim.runner import RunConfig, simulate_run
 from mtg_sim.sim.trace import format_trace
 
 DATA_DIR = Path(__file__).parent.parent.parent
+DEFAULT_LIBRARY = DATA_DIR / "card_library.csv"
 
 
 def main() -> None:
@@ -21,12 +22,12 @@ def main() -> None:
     parser.add_argument("--mana-r", type=int, default=0)
     parser.add_argument("--mana-c", type=int, default=0)
     parser.add_argument("--curiosity-count", type=int, default=1)
-    parser.add_argument("--csv", default=str(DATA_DIR / "mtg_sim_card_data_v1.csv"))
-    parser.add_argument("--decklist", default=str(DATA_DIR / "testdecklist.txt"))
+    parser.add_argument("--deck-ids", nargs="*", type=int, default=None,
+                        help="Card IDs for active deck (default: IDs 2-100)")
     args = parser.parse_args()
 
-    load_cards(args.csv)
-    all_cards = load_decklist(args.decklist)
+    load_card_library(str(DEFAULT_LIBRARY))
+    active_deck = build_active_deck(args.deck_ids)
 
     cfg = RunConfig(
         seed=args.seed,
@@ -35,7 +36,7 @@ def main() -> None:
         curiosity_effect_count=args.curiosity_count,
     )
 
-    result = simulate_run(cfg, all_cards)
+    result = simulate_run(cfg, active_deck)
     print(format_trace(result, show_full=True))
 
 
