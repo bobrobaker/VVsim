@@ -47,3 +47,49 @@ def test_library_minus_hand():
     assert "Lotus Petal" not in state.library
     assert "Vivi Ornitier" not in state.library
     assert len(state.hand) == 2
+
+
+def test_default_starting_battlefield():
+    cards = _load()
+    cfg = RunConfig(seed=1, starting_hand=[], starting_floating_mana=ManaPool(U=1))
+    rng = Random(1)
+    state = _build_initial_state(cfg, cards, rng)
+    bf_names = [p.card_name for p in state.battlefield]
+    assert "Volcanic Island" in bf_names
+    assert "Vivi Ornitier" in bf_names
+    assert "Volcanic Island" not in state.library
+    assert state.land_play_available is False
+
+
+def test_custom_starting_battlefield():
+    cards = _load()
+    cfg = RunConfig(
+        seed=1,
+        starting_hand=[],
+        starting_floating_mana=ManaPool(U=1),
+        starting_battlefield=["Island"],
+        land_play_available=True,
+    )
+    rng = Random(1)
+    state = _build_initial_state(cfg, cards, rng)
+    bf_names = [p.card_name for p in state.battlefield]
+    assert "Island" in bf_names
+    assert "Volcanic Island" not in bf_names
+    assert "Island" not in state.library
+    assert state.land_play_available is True
+
+
+def test_validate_state_catches_duplicate():
+    from mtg_sim.sim.state import validate_state
+    cards = _load()
+    cfg = RunConfig(seed=1, starting_hand=[], starting_floating_mana=ManaPool(U=1))
+    rng = Random(1)
+    state = _build_initial_state(cfg, cards, rng)
+    # Manually corrupt state: put Sol Ring in both hand and library
+    state.hand.append("Sol Ring")
+    state.library.insert(0, "Sol Ring")
+    try:
+        validate_state(state)
+        assert False, "Expected AssertionError"
+    except AssertionError as e:
+        assert "Sol Ring" in str(e)

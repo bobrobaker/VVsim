@@ -56,10 +56,11 @@ class ManaCost:
     generic: int = 0
     x_cost: bool = False
     x_value: int = 0
+    pip_ur_hybrid: int = 0  # {U/R} hybrid pips — satisfied by U, R, or ANY (not C)
 
     @property
     def total_mana(self) -> int:
-        return self.pip_u + self.pip_r + self.generic + self.x_value
+        return self.pip_u + self.pip_r + self.generic + self.x_value + self.pip_ur_hybrid
 
     def is_free(self) -> bool:
         return self.total_mana == 0
@@ -78,28 +79,35 @@ class ManaCost:
             parts.append("U" * self.pip_u)
         if self.pip_r:
             parts.append("R" * self.pip_r)
+        if self.pip_ur_hybrid:
+            parts.append("{U/R}" * self.pip_ur_hybrid)
         return "{" + "".join(parts) + "}" if parts else "{0}"
 
 
 def can_pay_cost(pool: ManaPool, cost: ManaCost) -> bool:
+    # Pure U pips: U first, then ANY
     u_from_any = max(0, cost.pip_u - pool.U)
     if u_from_any > pool.ANY:
         return False
-
     remaining_any = pool.ANY - u_from_any
+
+    # Pure R pips: R first, then remaining ANY
     r_from_any = max(0, cost.pip_r - pool.R)
     if r_from_any > remaining_any:
         return False
-
     remaining_any -= r_from_any
+
+    # Hybrid {U/R} pips: surplus U, then surplus R, then remaining ANY (C cannot pay hybrid)
+    surplus_u = max(0, pool.U - cost.pip_u)
+    surplus_r = max(0, pool.R - cost.pip_r)
+    available_for_hybrid = surplus_u + surplus_r + remaining_any
+    if cost.pip_ur_hybrid > available_for_hybrid:
+        return False
+    remaining_after_hybrid = available_for_hybrid - cost.pip_ur_hybrid
+
+    # Generic: whatever colored surplus remains after hybrid + C
     generic_needed = cost.generic + cost.x_value
-    available_for_generic = (
-        max(0, pool.U - cost.pip_u)
-        + max(0, pool.R - cost.pip_r)
-        + pool.C
-        + remaining_any
-    )
-    return available_for_generic >= generic_needed
+    return remaining_after_hybrid + pool.C >= generic_needed
 
 
 def pay_cost(pool: ManaPool, cost: ManaCost) -> ManaPool:
@@ -108,17 +116,27 @@ def pay_cost(pool: ManaPool, cost: ManaCost) -> ManaPool:
 
     p = pool.copy()
 
-    # Pay U pips: use U first, then ANY
+    # Pay pure U pips: U first, then ANY
     u_from_u = min(cost.pip_u, p.U)
     p.U -= u_from_u
     p.ANY -= cost.pip_u - u_from_u
 
-    # Pay R pips: use R first, then ANY
+    # Pay pure R pips: R first, then ANY
     r_from_r = min(cost.pip_r, p.R)
     p.R -= r_from_r
     p.ANY -= cost.pip_r - r_from_r
 
-    # Pay generic: use C first, then ANY, then U, then R
+    # Pay hybrid {U/R} pips: surplus U first, then surplus R, then ANY
+    hybrid = cost.pip_ur_hybrid
+    h_from_u = min(hybrid, p.U)
+    p.U -= h_from_u
+    hybrid -= h_from_u
+    h_from_r = min(hybrid, p.R)
+    p.R -= h_from_r
+    hybrid -= h_from_r
+    p.ANY -= hybrid
+
+    # Pay generic: C first, then ANY, then U, then R
     generic = cost.generic + cost.x_value
     take = min(generic, p.C)
     p.C -= take

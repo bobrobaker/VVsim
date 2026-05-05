@@ -23,6 +23,10 @@ def main() -> None:
     parser.add_argument("--mana-c", type=int, default=0, help="Starting colorless mana")
     parser.add_argument("--curiosity-count", type=int, default=1)
     parser.add_argument("--short", action="store_true", help="Print summary only")
+    parser.add_argument("--manual", action="store_true",
+                        help="Interactive mode: choose each action manually")
+    parser.add_argument("--no-opponent-island", action="store_true",
+                        help="Assume opponent does NOT control an island (disables Mogg Salvage free cost)")
     parser.add_argument(
         "--csv", default=str(DATA_DIR / "mtg_sim_card_data_v1.csv")
     )
@@ -44,6 +48,8 @@ def main() -> None:
         starting_hand=args.hand,
         starting_floating_mana=ManaPool(U=args.mana_u, R=args.mana_r, C=args.mana_c),
         curiosity_effect_count=args.curiosity_count,
+        manual_mode=args.manual,
+        opponent_controls_island=not args.no_opponent_island,
         csv_path=args.csv,
         decklist_path=args.decklist,
     )

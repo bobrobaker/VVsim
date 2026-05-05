@@ -14,6 +14,7 @@ class CardData:
     pip_u: int
     pip_r: int
     generic_mana: int
+    pip_ur_hybrid: int
     x_in_cost: bool
     card_types: str
     is_noncreature_spell: bool
@@ -33,6 +34,7 @@ class CardData:
     requires_discard: bool
     requires_exile: bool
     requires_creature: bool
+    has_flash: bool
 
     @property
     def is_land(self) -> bool:
@@ -105,6 +107,7 @@ def load_cards(csv_path: str) -> dict[str, CardData]:
                 pip_u=_parse_int(row["pip_u"]),
                 pip_r=_parse_int(row["pip_r"]),
                 generic_mana=_parse_int(row["generic_mana"]),
+                pip_ur_hybrid=_parse_int(row.get("pip_ur_hybrid", "0")),
                 x_in_cost=_parse_bool(row["x_in_cost"]),
                 card_types=row["card_types"].strip(),
                 is_noncreature_spell=_parse_bool(row["is_noncreature_spell"]),
@@ -124,6 +127,7 @@ def load_cards(csv_path: str) -> dict[str, CardData]:
                 requires_discard=_parse_bool(row["requires_discard"]),
                 requires_exile=_parse_bool(row["requires_exile"]),
                 requires_creature=_parse_bool(row["requires_creature"]),
+                has_flash=_parse_bool(row.get("has_flash", "false")),
             )
             _CARD_DB[card.name] = card
     return _CARD_DB

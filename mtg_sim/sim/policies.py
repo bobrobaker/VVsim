@@ -5,6 +5,7 @@ from .actions import (
     Action,
     CAST_SPELL, RESOLVE_STACK_OBJECT, PLAY_LAND,
     ACTIVATE_MANA_ABILITY, EXILE_FOR_MANA, SACRIFICE_FOR_MANA,
+    CHOOSE_IMPRINT, CHOOSE_DISCARD, CHOOSE_TUTOR,
     RISK_SAFE, RISK_NORMAL, RISK_EXPENSIVE, RISK_RISKY, RISK_DESPERATE,
     EXTRA_TURN_WIN_CARDS, NONCREATURE_SPELL_WIN_THRESHOLD,
 )
@@ -104,6 +105,13 @@ def score_action(state: GameState, action: Action) -> float:
         if obj is None:
             return 20.0
 
+        # Draw trigger: the only reason to delay is if LED can be cracked first —
+        # mana abilities are legal any time you hold priority.
+        if obj.is_draw_trigger:
+            if _led_crack_is_better(state):
+                return 30.0
+            return 82.0
+
         # Resolve mana producers ASAP (Rite of Flame, Strike It Rich, etc.)
         if _will_produce_mana(obj.card_name):
             return 85.0
@@ -115,12 +123,18 @@ def score_action(state: GameState, action: Action) -> float:
                               "Mox Opal", "Mox Amber", "Springleaf Drum"):
             return 80.0
 
-        # If nothing else to cast, resolve everything
-        castable_count = sum(1 for a in [] if a.action_type == CAST_SPELL)
         return 40.0
 
     # ── Mana actions ──────────────────────────────────────────────────────────
     if action.action_type in (ACTIVATE_MANA_ABILITY, SACRIFICE_FOR_MANA):
+        # LED crack with pending draws + small hand: discard near-empty hand,
+        # get 3 mana, then resolve curiosity draws into fresh cards.
+        if (action.action_type == SACRIFICE_FOR_MANA
+                and action.source_card == "Lion's Eye Diamond"
+                and state.pending_curiosity_draws > 0
+                and len(state.hand) <= 1):
+            return 88.0
+
         # Only activate mana if it enables a currently unaffordable spell
         if _mana_enables_new_cast(state, action):
             return 90.0
@@ -139,6 +153,16 @@ def score_action(state: GameState, action: Action) -> float:
         if _land_enables_new_cast(state, action):
             return 78.0
         return 55.0
+
+    # ── Pending choice actions ────────────────────────────────────────────────
+    if action.action_type == CHOOSE_IMPRINT:
+        return _score_imprint(state, action)
+
+    if action.action_type == CHOOSE_DISCARD:
+        return _score_discard(state, action)
+
+    if action.action_type == CHOOSE_TUTOR:
+        return _score_tutor(state, action)
 
     return 0.0
 
@@ -172,6 +196,20 @@ def _will_produce_mana(card_name: str) -> bool:
     return card_name in MANA_PRODUCERS
 
 
+def _led_crack_is_better(state: GameState) -> bool:
+    """True when cracking LED before resolving draws is the right play.
+
+    Conditions: LED is on the battlefield, hand is tiny (≤1 card), and there
+    are pending curiosity draws queued up — discarding a nearly-empty hand and
+    getting 3 mana before drawing new cards is a net gain.
+    """
+    if state.pending_curiosity_draws <= 0:
+        return False
+    if len(state.hand) > 1:
+        return False
+    return any(p.card_name == "Lion's Eye Diamond" for p in state.battlefield)
+
+
 def _mana_is_tight(state: GameState) -> bool:
     return state.floating_mana.total() <= 2
 
@@ -196,10 +234,97 @@ def _mana_enables_new_cast(state: GameState, mana_action: Action) -> bool:
         cd = get_card(card_name)
         if cd is None or cd.is_land or cd.is_creature:
             continue
-        cost = ManaCost(pip_u=cd.pip_u, pip_r=cd.pip_r, generic=cd.generic_mana)
+        cost = ManaCost(pip_u=cd.pip_u, pip_r=cd.pip_r, generic=cd.generic_mana,
+                        pip_ur_hybrid=cd.pip_ur_hybrid)
         if not can_pay_cost(state.floating_mana, cost) and can_pay_cost(simulated_pool, cost):
             return True
     return False
+
+
+_TUTOR_PRIORITY = [
+    "Alchemist's Gambit", "Final Fortune", "Last Chance", "Warrior's Oath",
+    "Gitaxian Probe", "Lotus Petal", "Lion's Eye Diamond", "Simian Spirit Guide",
+    "Fierce Guardianship", "Pact of Negation",
+    "Rite of Flame", "Mystical Tutor", "Merchant Scroll", "Solve the Equation",
+    "Gamble", "Intuition",
+    "Force of Will", "Swan Song", "Flusterstorm", "Mental Misstep",
+]
+
+
+def _score_imprint(state: GameState, action: Action) -> float:
+    """Score a CHOOSE_IMPRINT action: prefer cheap cards that produce a needed color."""
+    from .cards import get_card
+    card = action.source_card
+    if card is None:
+        return 1.0  # no imprint: Chrome Mox is a dead card
+
+    cd = get_card(card)
+    if cd is None:
+        return 10.0
+
+    score = 50.0  # baseline: imprinting something is better than nothing
+
+    # Strongly prefer not to imprint high-priority / win cards
+    priority_idx = next((i for i, c in enumerate(_TUTOR_PRIORITY) if c == card), None)
+    if priority_idx is not None:
+        score -= max(5.0, 40.0 - priority_idx * 2.0)
+
+    # Bonus when the color Chrome Mox would produce is needed
+    color = "U" if cd.has_blue else "R"
+    need_u = sum(1 for c in state.hand if (c2 := get_card(c)) and c2 and c2.pip_u > 0)
+    need_r = sum(1 for c in state.hand if (c2 := get_card(c)) and c2 and c2.pip_r > 0)
+    if color == "U" and need_u > state.floating_mana.U:
+        score += 15.0
+    if color == "R" and need_r > state.floating_mana.R:
+        score += 15.0
+
+    # Prefer imprinting lower-MV cards (less opportunity cost)
+    score -= cd.mv * 4.0
+
+    return score
+
+
+def _score_discard(state: GameState, action: Action) -> float:
+    """Score a CHOOSE_DISCARD action (Mox Diamond land discard)."""
+    from .cards import get_card
+    land = action.source_card
+    if land is None:
+        return 1.0  # sacrificing Mox Diamond is worst case
+
+    cd = get_card(land)
+    if cd is None:
+        return 20.0
+
+    score = 60.0
+
+    # Prefer to discard tapped or enters-tapped lands (less immediate value)
+    if cd.land_enters_tapped == "true":
+        score += 15.0
+
+    # Prefer to discard basic lands over dual lands (basics are replaceable)
+    if "Basic" in cd.card_types:
+        score += 10.0
+
+    # Prefer to discard lands that produce colors we already have plenty of
+    colors = cd.mana_colors or ""
+    if "U" in colors and state.floating_mana.U >= 2:
+        score += 5.0
+    if "R" in colors and state.floating_mana.R >= 2:
+        score += 5.0
+
+    return score
+
+
+def _score_tutor(state: GameState, action: Action) -> float:
+    """Score a CHOOSE_TUTOR action by priority list position."""
+    card = action.source_card
+    if card is None:
+        return 0.0
+    try:
+        idx = _TUTOR_PRIORITY.index(card)
+        return 100.0 - idx * 3.0
+    except ValueError:
+        return 50.0  # unlisted cards get a mid-range score
 
 
 def _land_enables_new_cast(state: GameState, land_action: Action) -> bool:
@@ -235,7 +360,8 @@ def _land_enables_new_cast(state: GameState, land_action: Action) -> bool:
         c = get_card(card_name)
         if c is None or c.is_land:
             continue
-        cost = ManaCost(pip_u=c.pip_u, pip_r=c.pip_r, generic=c.generic_mana)
+        cost = ManaCost(pip_u=c.pip_u, pip_r=c.pip_r, generic=c.generic_mana,
+                        pip_ur_hybrid=c.pip_ur_hybrid)
         if not can_pay_cost(state.floating_mana, cost) and can_pay_cost(simulated, cost):
             return True
     return False

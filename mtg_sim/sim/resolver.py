@@ -5,6 +5,7 @@ from .mana import pay_cost, choose_mana_color
 from .actions import (
     CAST_SPELL, RESOLVE_STACK_OBJECT, PLAY_LAND,
     ACTIVATE_MANA_ABILITY, EXILE_FOR_MANA, SACRIFICE_FOR_MANA,
+    CHOOSE_IMPRINT, CHOOSE_DISCARD, CHOOSE_TUTOR,
     EXTRA_TURN_WIN_CARDS,
 )
 from .stack import StackObject
@@ -61,6 +62,12 @@ def resolve_action(state: GameState, action: Action) -> None:
         _resolve_exile_for_mana(state, action, log)
     elif action.action_type == SACRIFICE_FOR_MANA:
         _resolve_sacrifice_for_mana(state, action, log)
+    elif action.action_type == CHOOSE_IMPRINT:
+        _resolve_choose_imprint(state, action, log)
+    elif action.action_type == CHOOSE_DISCARD:
+        _resolve_choose_discard(state, action, log)
+    elif action.action_type == CHOOSE_TUTOR:
+        _resolve_choose_tutor(state, action, log)
 
     log.mana_after = state.floating_mana.copy()
     log.hand_size_after = len(state.hand)
@@ -85,16 +92,11 @@ def _resolve_cast_spell(state: GameState, action: Action, log: ActionLog) -> Non
         state.exile.append(pitched)
         log.notes.append(f"Pitched {pitched}")
 
-    # For pitch_blue_blue (Commandeer): pitch a second blue card
-    if action.alt_cost_type == "pitch_blue_blue":
-        from .action_generator import _blue_cards_in_hand_except
-        blues = _blue_cards_in_hand_except(state, card_name or "")
-        if blues:
-            second = [b for b in blues if b != pitched]
-            if second:
-                _remove_one(state.hand, second[0])
-                state.exile.append(second[0])
-                log.notes.append(f"Pitched second blue: {second[0]}")
+    # For pitch_blue_blue (Commandeer): both pitched cards are encoded in the action
+    if action.alt_cost_type == "pitch_blue_blue" and action.costs.pitched_card_2:
+        _remove_one(state.hand, action.costs.pitched_card_2)
+        state.exile.append(action.costs.pitched_card_2)
+        log.notes.append(f"Pitched second blue: {action.costs.pitched_card_2}")
 
     # Pay exile_from_hand cost (Simian Spirit Guide via CAST path - not needed for SSG which is EXILE_FOR_MANA)
     if action.costs.exile_from_hand:
@@ -124,9 +126,11 @@ def _resolve_cast_spell(state: GameState, action: Action, log: ActionLog) -> Non
         pass  # LED just enters battlefield; special action is SACRIFICE_FOR_MANA
 
     # Put on stack
+    target_name = _lookup_target_name(state, action.target)
     obj = StackObject(
         card_name=card_name or "",
         targets=[action.target] if action.target else [],
+        target_names=[target_name] if target_name else [],
         x_value=action.x_value,
         alt_cost_used=action.alt_cost_type,
         pitched_card=pitched,
@@ -134,18 +138,23 @@ def _resolve_cast_spell(state: GameState, action: Action, log: ActionLog) -> Non
     state.stack.append(obj)
     state.total_spells_cast += 1
 
-    # Noncreature spell: draw from Curiosity immediately
+    log.event_type = "CAST_SPELL"
+
+    # Noncreature spell: Vivi deals damage → Curiosity triggers → one draw-trigger stack
+    # object placed above the spell, representing draw_count draws to be taken on resolution.
     if cd and cd.is_noncreature_spell:
         state.noncreature_spells_cast += 1
-        drawn = draw_cards(state, state.cards_drawn_per_noncreature_spell)
-        log.cards_drawn = drawn
-        log.event_type = "CAST_SPELL"
-        log.notes.append(
-            f"Curiosity draw: {len(drawn)} cards "
-            f"(total noncreature: {state.noncreature_spells_cast})"
+        n = state.cards_drawn_per_noncreature_spell
+        draw_trigger = StackObject(
+            card_name="_DrawTrigger",
+            is_draw_trigger=True,
+            draw_count=n,
         )
-    else:
-        log.event_type = "CAST_SPELL"
+        state.stack.append(draw_trigger)
+        log.notes.append(
+            f"Curiosity: draw trigger ({n} draws) placed above {card_name} on stack "
+            f"(noncreature cast: {state.noncreature_spells_cast})"
+        )
 
 
 # ── Resolve stack object ──────────────────────────────────────────────────────
@@ -163,19 +172,19 @@ def _resolve_stack_object(state: GameState, action: Action, log: ActionLog) -> N
         log.notes.append(f"RESOLVE: object {stack_id} not found on stack")
         return
 
+    # Curiosity draw trigger: just draw, no card lookup or zone transition.
+    if obj.is_draw_trigger:
+        drawn = draw_cards(state, obj.draw_count)
+        log.cards_drawn = drawn
+        log.event_type = "CURIOSITY_DRAW"
+        log.action_description = f"Curiosity draws: {len(drawn)} cards"
+        log.notes.append(f"Drew {len(drawn)} cards from Curiosity trigger")
+        return
+
     card_name = obj.card_name
     cd = get_card(card_name)
     log.event_type = "RESOLVE_SPELL"
     log.action_description = f"Resolve {card_name}"
-
-    # Check if this spell was countered (target was countered by another spell on the stack)
-    # In this sim we handle countering by checking if the stack object that targeted this
-    # is still on the stack. For simplicity: counter effects are applied immediately.
-    if _is_countered(state, obj):
-        dest = "exile" if obj.alt_cost_used == "flashback" else "graveyard"
-        getattr(state, dest).append(card_name)
-        log.notes.append(f"{card_name} was countered → {dest}")
-        return
 
     # Apply card-specific behavior
     beh = CARD_BEHAVIORS.get(card_name)
@@ -193,22 +202,6 @@ def _resolve_stack_object(state: GameState, action: Action, log: ActionLog) -> N
         state.graveyard.append(card_name)
 
     log.notes.append(f"Resolved {card_name}")
-
-
-def _is_countered(state: GameState, obj: StackObject) -> bool:
-    """Check if a counterspell on the stack targets this object."""
-    from .cards import get_card
-    COUNTERSPELLS = {
-        "Force of Will", "Fierce Guardianship", "Pact of Negation",
-        "Swan Song", "Mental Misstep", "Disrupting Shoal", "Flusterstorm",
-        "Daze", "Snapback", "An Offer You Can't Refuse",
-    }
-    for other in state.stack:
-        if other.stack_id == obj.stack_id:
-            continue
-        if other.card_name in COUNTERSPELLS and obj.stack_id in other.targets:
-            return True
-    return False
 
 
 def _enter_battlefield(state: GameState, card_name: str, obj: StackObject) -> None:
@@ -281,17 +274,8 @@ def _resolve_activate_mana(state: GameState, action: Action, log: ActionLog) -> 
             if c_perm:
                 c_perm.tapped = True
 
-    # Apply mana
-    pool = action.effects.add_mana
-    # For ANY mana, choose best color based on current needs
-    if pool.ANY > 0:
-        chosen = _choose_best_color(state, pool.ANY)
-        actual = _any_to_color(chosen, pool.ANY)
-        state.floating_mana.add(actual)
-        log.notes.append(f"Added {actual} (chose {chosen} from flexible)")
-    else:
-        state.floating_mana.add(pool)
-
+    # Apply mana — color was already chosen at action-generation time
+    state.floating_mana.add(action.effects.add_mana)
     log.event_type = "ACTIVATE_MANA"
 
     # Depletion counters for limited-use lands
@@ -343,47 +327,114 @@ def _resolve_sacrifice_for_mana(state: GameState, action: Action, log: ActionLog
         state.graveyard.extend(discarded)
         log.notes.append(f"LED discarded: {discarded}")
 
+    # Color was already chosen at action-generation time
     pool = action.effects.add_mana
-    if pool.ANY > 0:
-        chosen = _choose_best_color(state, pool.ANY)
-        actual = _any_to_color(chosen, pool.ANY)
-        state.floating_mana.add(actual)
-        log.notes.append(f"Sacrificed {card_name} for {actual}")
-    else:
-        state.floating_mana.add(pool)
-        log.notes.append(f"Sacrificed {card_name} for {pool}")
-
+    state.floating_mana.add(pool)
+    log.notes.append(f"Sacrificed {card_name} for {pool}")
     log.event_type = "SACRIFICE"
+
+
+# ── Pending-choice resolvers ──────────────────────────────────────────────────
+
+def _resolve_choose_imprint(state: GameState, action: Action, log: ActionLog) -> None:
+    state.pending_choices = [c for c in state.pending_choices
+                              if not (c.choice_type == "imprint" and c.perm_id == action.target)]
+    log.event_type = "CHOOSE_IMPRINT"
+
+    card = action.source_card
+    if card is None:
+        log.action_description = "Chrome Mox enters without imprint"
+        log.notes.append("No eligible card to imprint")
+        return
+
+    perm = state.get_perm_by_id(action.target or "")
+    if perm is None:
+        return
+    _remove_one(state.hand, card)
+    state.exile.append(card)
+    perm.imprinted_card = card
+    log.action_description = f"Imprint {card} onto Chrome Mox"
+    log.notes.append(f"Imprinted {card}")
+
+
+def _resolve_choose_discard(state: GameState, action: Action, log: ActionLog) -> None:
+    state.pending_choices = [c for c in state.pending_choices
+                              if not (c.choice_type == "discard" and c.perm_id == action.target)]
+    log.event_type = "CHOOSE_DISCARD"
+
+    land = action.source_card
+    if land is None:
+        # No land available → sacrifice Mox Diamond
+        perm = state.remove_perm_by_id(action.target or "")
+        if perm:
+            state.graveyard.append("Mox Diamond")
+        log.action_description = "Mox Diamond sacrificed (no land to discard)"
+        log.notes.append("Sacrificed Mox Diamond")
+        return
+
+    _remove_one(state.hand, land)
+    state.graveyard.append(land)
+    log.action_description = f"Discard {land} for Mox Diamond"
+    log.notes.append(f"Discarded {land} for Mox Diamond")
+
+
+def _resolve_choose_tutor(state: GameState, action: Action, log: ActionLog) -> None:
+    # Pop the first pending tutor choice and capture its post_effect
+    pending = next((c for c in state.pending_choices if c.choice_type == "tutor"), None)
+    post_effect = pending.post_effect if pending else ""
+    state.pending_choices = [c for c in state.pending_choices
+                              if c is not pending]
+    log.event_type = "CHOOSE_TUTOR"
+
+    card = action.source_card
+    destination = action.alt_cost_type or "hand"
+
+    if card and card in state.library:
+        state.library.remove(card)
+        if destination == "top":
+            state.library.insert(0, card)
+            log.action_description = f"Tutor: put {card} on top"
+        else:
+            state.hand.append(card)
+            log.action_description = f"Tutor: {card} → hand"
+        log.notes.append(f"Tutored {card} → {destination}")
+
+    # Post-effects that fire unconditionally after the tutor choice
+    if post_effect == "gamble_discard":
+        if state.hand and state.rng:
+            discard = state.rng.choice(state.hand)
+            _remove_one(state.hand, discard)
+            state.graveyard.append(discard)
+            log.notes.append(f"Gamble discarded: {discard}")
+    elif post_effect == "intuition_discard_two":
+        for _ in range(min(2, len(state.library))):
+            filler = state.library.pop(0)
+            state.graveyard.append(filler)
+        log.notes.append("Intuition: 2 unchosen cards to graveyard")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _choose_best_color(state: GameState, amount: int) -> str:
-    """Choose U or R based on what we need more."""
-    from .cards import get_card
-    need_u = sum(1 for c in state.hand if (cd := get_card(c)) and cd.pip_u > 0)
-    need_r = sum(1 for c in state.hand if (cd := get_card(c)) and cd.pip_r > 0)
-    if state.floating_mana.U < state.floating_mana.R and need_u >= need_r:
-        return "U"
-    if state.floating_mana.R < state.floating_mana.U and need_r > need_u:
-        return "R"
-    return "U" if need_u >= need_r else "R"
-
-
-def _any_to_color(color: str, amount: int) -> "ManaPool":
-    from .mana import ManaPool
-    if color == "U":
-        return ManaPool(U=amount)
-    elif color == "R":
-        return ManaPool(R=amount)
-    return ManaPool(C=amount)
+def _lookup_target_name(state: GameState, target_id: str | None) -> str | None:
+    """Resolve a target ID to a human-readable name for display in stack repr."""
+    if target_id is None:
+        return None
+    for obj in state.stack:
+        if obj.stack_id == target_id and not obj.is_draw_trigger:
+            return obj.card_name
+    for perm in state.battlefield:
+        if perm.perm_id == target_id:
+            return perm.card_name
+    if state._opponent_creature_perm and state._opponent_creature_perm.perm_id == target_id:
+        return "[opponent dummy creature]"
+    if state._opponent_artifact_perm and state._opponent_artifact_perm.perm_id == target_id:
+        return "[opponent dummy artifact]"
+    return None
 
 
 def _remove_one(lst: list, item: str) -> None:
-    try:
-        lst.remove(item)
-    except ValueError:
-        pass
+    assert item in lst, f"Zone error: expected {item!r} in list but not found; list={lst}"
+    lst.remove(item)
 
 
 def _remove_permission(state: GameState, card_name: str) -> None:

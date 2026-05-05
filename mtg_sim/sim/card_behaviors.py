@@ -25,10 +25,14 @@ if TYPE_CHECKING:
 # ── Base class ────────────────────────────────────────────────────────────────
 
 class CardBehavior:
-    def generate_actions(self, state: GameState, card_name: str) -> list[Action]:
-        return []
+    def generate_actions(self, state: GameState, card_name: str) -> list[Action] | None:
+        # Return None to delegate to generic scaffolding; return a list to own generation.
+        return None
 
     def generate_mana_actions(self, state: GameState, perm: Permanent) -> list[Action]:
+        return []
+
+    def generate_pending_actions(self, state: GameState, choice) -> list[Action]:
         return []
 
     def resolve_cast(self, state: GameState, stack_obj: StackObject) -> None:
@@ -86,14 +90,17 @@ class GrimMonolithBehavior(CardBehavior):
 
 class LotusPetalBehavior(CardBehavior):
     def generate_mana_actions(self, state, perm):
-        return [Action(
-            action_type=SACRIFICE_FOR_MANA,
-            source_card="Lotus Petal",
-            description="Sacrifice Lotus Petal for 1 mana",
-            costs=CostBundle(sacrifice_permanent_id=perm.perm_id),
-            effects=EffectBundle(add_mana=ManaPool(ANY=1)),
-            risk_level=RISK_SAFE,
-        )]
+        return [
+            Action(
+                action_type=SACRIFICE_FOR_MANA,
+                source_card="Lotus Petal",
+                description=f"Sacrifice Lotus Petal for {{{color}}}",
+                costs=CostBundle(sacrifice_permanent_id=perm.perm_id),
+                effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
+                risk_level=RISK_SAFE,
+            )
+            for color in ("U", "R", "C")
+        ]
 
 
 # ── Mana: Lion's Eye Diamond ─────────────────────────────────────────────────
@@ -146,22 +153,42 @@ class ChromeMoxBehavior(CardBehavior):
             risk_level=RISK_SAFE,
         )]
 
-    def on_enter(self, state, perm):
+    def generate_pending_actions(self, state, choice) -> list[Action]:
         from .cards import get_card
-        # Choose cheapest non-artifact non-land colored card to imprint
+        from .actions import CHOOSE_IMPRINT, RISK_NORMAL, RISK_SAFE
+        perm = state.get_perm_by_id(choice.perm_id)
         candidates = [
             c for c in state.hand
-            if (cd := get_card(c)) and not cd.is_artifact and not cd.is_land
-            and (cd.has_blue or cd.has_red) and c != "Chrome Mox"
+            if c != "Chrome Mox"
+            and (cd := get_card(c)) and not cd.is_artifact and not cd.is_land
+            and (cd.has_blue or cd.has_red)
+        ] if perm else []
+        actions = [
+            Action(
+                action_type=CHOOSE_IMPRINT,
+                source_card=card,
+                description=f"Imprint {card} onto Chrome Mox",
+                target=choice.perm_id,
+                risk_level=RISK_NORMAL,
+            )
+            for card in set(candidates)
         ]
-        if not candidates:
-            return
-        # Prefer lowest-MV card (least valuable to imprint)
-        candidates.sort(key=lambda c: get_card(c).mv)
-        chosen = candidates[0]
-        state.hand.remove(chosen)
-        state.exile.append(chosen)
-        perm.imprinted_card = chosen
+        actions.append(Action(
+            action_type=CHOOSE_IMPRINT,
+            source_card=None,
+            description="Chrome Mox enters without imprint (no eligible card)",
+            target=choice.perm_id,
+            risk_level=RISK_SAFE,
+        ))
+        return actions
+
+    def on_enter(self, state, perm):
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="imprint",
+            perm_id=perm.perm_id,
+            source_card="Chrome Mox",
+        ))
 
     def resolve_cast(self, state, stack_obj):
         pass
@@ -170,29 +197,50 @@ class ChromeMoxBehavior(CardBehavior):
 # ── Mana: Mox Diamond ────────────────────────────────────────────────────────
 
 class MoxDiamondBehavior(CardBehavior):
-    def on_enter(self, state, perm):
-        # Discard a land on ETB or sacrifice Mox Diamond
+    def generate_pending_actions(self, state, choice) -> list[Action]:
+        from .actions import CHOOSE_DISCARD, RISK_SAFE, RISK_RISKY
         lands = state.lands_in_hand()
         if lands:
-            chosen = lands[0]
-            state.hand.remove(chosen)
-            state.graveyard.append(chosen)
-        else:
-            # Must sacrifice
-            state.remove_perm_by_id(perm.perm_id)
-            state.graveyard.append("Mox Diamond")
+            return [
+                Action(
+                    action_type=CHOOSE_DISCARD,
+                    source_card=land,
+                    description=f"Discard {land} for Mox Diamond",
+                    target=choice.perm_id,
+                    risk_level=RISK_SAFE,
+                )
+                for land in set(lands)
+            ]
+        return [Action(
+            action_type=CHOOSE_DISCARD,
+            source_card=None,
+            description="Sacrifice Mox Diamond (no land in hand)",
+            target=choice.perm_id,
+            risk_level=RISK_RISKY,
+        )]
+
+    def on_enter(self, state, perm):
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="discard",
+            perm_id=perm.perm_id,
+            source_card="Mox Diamond",
+        ))
 
     def generate_mana_actions(self, state, perm):
         if perm.tapped:
             return []
-        return [Action(
-            action_type=ACTIVATE_MANA_ABILITY,
-            source_card="Mox Diamond",
-            description="Tap Mox Diamond for 1 mana",
-            costs=CostBundle(tap_permanent_id=perm.perm_id),
-            effects=EffectBundle(add_mana=ManaPool(ANY=1)),
-            risk_level=RISK_SAFE,
-        )]
+        return [
+            Action(
+                action_type=ACTIVATE_MANA_ABILITY,
+                source_card="Mox Diamond",
+                description=f"Tap Mox Diamond for {{{color}}}",
+                costs=CostBundle(tap_permanent_id=perm.perm_id),
+                effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
+                risk_level=RISK_SAFE,
+            )
+            for color in ("U", "R", "C")
+        ]
 
 
 # ── Mana: Mox Opal (metalcraft) ──────────────────────────────────────────────
@@ -203,14 +251,17 @@ class MoxOpalBehavior(CardBehavior):
             return []
         if state.count_artifacts() < 3:
             return []
-        return [Action(
-            action_type=ACTIVATE_MANA_ABILITY,
-            source_card="Mox Opal",
-            description="Tap Mox Opal (metalcraft) for 1 mana",
-            costs=CostBundle(tap_permanent_id=perm.perm_id),
-            effects=EffectBundle(add_mana=ManaPool(ANY=1)),
-            risk_level=RISK_SAFE,
-        )]
+        return [
+            Action(
+                action_type=ACTIVATE_MANA_ABILITY,
+                source_card="Mox Opal",
+                description=f"Tap Mox Opal (metalcraft) for {{{color}}}",
+                costs=CostBundle(tap_permanent_id=perm.perm_id),
+                effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
+                risk_level=RISK_SAFE,
+            )
+            for color in ("U", "R", "C")
+        ]
 
 
 # ── Mana: Mox Amber (legendary) ──────────────────────────────────────────────
@@ -221,15 +272,18 @@ class MoxAmberBehavior(CardBehavior):
             return []
         if not state.legendary_permanent_available:
             return []
-        # Vivi is UR legendary
-        return [Action(
-            action_type=ACTIVATE_MANA_ABILITY,
-            source_card="Mox Amber",
-            description="Tap Mox Amber (Vivi legendary) for 1 mana",
-            costs=CostBundle(tap_permanent_id=perm.perm_id),
-            effects=EffectBundle(add_mana=ManaPool(ANY=1)),
-            risk_level=RISK_SAFE,
-        )]
+        # Vivi is a UR legendary; produce U or R only (no colorless from Mox Amber)
+        return [
+            Action(
+                action_type=ACTIVATE_MANA_ABILITY,
+                source_card="Mox Amber",
+                description=f"Tap Mox Amber (Vivi legendary) for {{{color}}}",
+                costs=CostBundle(tap_permanent_id=perm.perm_id),
+                effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
+                risk_level=RISK_SAFE,
+            )
+            for color in ("U", "R")
+        ]
 
 
 # ── Mana: Springleaf Drum ────────────────────────────────────────────────────
@@ -242,18 +296,18 @@ class SpringleafDrumBehavior(CardBehavior):
             return []
         creature = state.get_untapped_creature_perm()
         cid = creature.perm_id if creature else "vivi"
-        return [Action(
-            action_type=ACTIVATE_MANA_ABILITY,
-            source_card="Springleaf Drum",
-            description="Tap Springleaf Drum + creature for 1 mana",
-            costs=CostBundle(
-                tap_permanent_id=perm.perm_id,
-                # Tapping Vivi is handled in resolver via flag
-            ),
-            effects=EffectBundle(add_mana=ManaPool(ANY=1)),
-            risk_level=RISK_SAFE,
-            alt_cost_type=f"tap_creature:{cid}",
-        )]
+        return [
+            Action(
+                action_type=ACTIVATE_MANA_ABILITY,
+                source_card="Springleaf Drum",
+                description=f"Tap Springleaf Drum + creature for {{{color}}}",
+                costs=CostBundle(tap_permanent_id=perm.perm_id),
+                effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
+                risk_level=RISK_SAFE,
+                alt_cost_type=f"tap_creature:{cid}",
+            )
+            for color in ("U", "R", "C")
+        ]
 
 
 # ── Mana: Simian Spirit Guide (exile from hand) ───────────────────────────────
@@ -331,75 +385,81 @@ class JeskasWillBehavior(CardBehavior):
 
 class GambleBehavior(CardBehavior):
     def resolve_cast(self, state, stack_obj):
-        # Tutor any card to hand, then discard random card
         if not state.library:
             return
-        # Find best target (handled by policy via tutor choice; here we pull "best")
-        # For simulation: pick the most useful card not already in hand
-        target = _pick_best_tutor_target(state, "any")
-        if target and target in state.library:
-            state.library.remove(target)
-            state.hand.append(target)
-            state.trace[-1].notes.append(f"Gamble tutored: {target}")
-        # Discard random card from hand
-        if state.hand and state.rng:
-            discard = state.rng.choice(state.hand)
-            state.hand.remove(discard)
-            state.graveyard.append(discard)
-            state.trace[-1].notes.append(f"Gamble discarded: {discard}")
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="any",
+            tutor_destination="hand",
+            source_card="Gamble",
+            post_effect="gamble_discard",
+        ))
 
 
 # ── Spell: Mystical Tutor ─────────────────────────────────────────────────────
 
 class MysticalTutorBehavior(CardBehavior):
     def resolve_cast(self, state, stack_obj):
-        target = _pick_best_tutor_target(state, "instant_sorcery")
-        if target and target in state.library:
-            state.library.remove(target)
-            state.library.insert(0, target)
-            state.trace[-1].notes.append(f"Mystical Tutor put {target} on top")
+        if not state.library:
+            return
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="instant_sorcery",
+            tutor_destination="top",
+            source_card="Mystical Tutor",
+        ))
 
 
 # ── Spell: Merchant Scroll ────────────────────────────────────────────────────
 
 class MerchantScrollBehavior(CardBehavior):
     def resolve_cast(self, state, stack_obj):
-        from .cards import get_card
-        target = _pick_best_tutor_target(state, "blue_instant")
-        if target and target in state.library:
-            state.library.remove(target)
-            state.hand.append(target)
-            state.trace[-1].notes.append(f"Merchant Scroll found: {target}")
+        if not state.library:
+            return
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="blue_instant",
+            tutor_destination="hand",
+            source_card="Merchant Scroll",
+        ))
 
 
 # ── Spell: Solve the Equation ─────────────────────────────────────────────────
 
 class SolveTheEquationBehavior(CardBehavior):
     def resolve_cast(self, state, stack_obj):
-        target = _pick_best_tutor_target(state, "instant_sorcery")
-        if target and target in state.library:
-            state.library.remove(target)
-            state.hand.append(target)
-            state.trace[-1].notes.append(f"Solve the Equation found: {target}")
+        if not state.library:
+            return
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="instant_sorcery",
+            tutor_destination="hand",
+            source_card="Solve the Equation",
+        ))
 
 
 # ── Spell: Intuition ──────────────────────────────────────────────────────────
 
 class IntuitionBehavior(CardBehavior):
     def resolve_cast(self, state, stack_obj):
-        from .cards import get_card
-        # Greedy: search for 3 cards, assume we get the best one
-        # (opponent picks which one we get; we assume best case = best card)
-        target = _pick_best_tutor_target(state, "any")
-        if target and target in state.library:
-            # Grab target + 2 filler cards
-            state.library.remove(target)
-            state.hand.append(target)
-            # The other 2 go to graveyard
-            for _ in range(min(2, len(state.library))):
-                card = state.library.pop(0)
-                state.graveyard.append(card)
-            state.trace[-1].notes.append(f"Intuition (greedy) got: {target}")
+        # Greedy sim assumption: opponent always gives us the best card.
+        # The player's 3-card pile choice is not modelled as a pending choice
+        # because the opponent decides which you get — exposing the pile choice
+        # to policy without modelling the opponent response adds noise.
+        if not state.library:
+            return
+        from .state import PendingChoice
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="any",
+            tutor_destination="hand",
+            source_card="Intuition",
+            post_effect="intuition_discard_two",
+        ))
 
 
 # ── Spell: Gitaxian Probe ─────────────────────────────────────────────────────
@@ -414,6 +474,26 @@ class GitaxianProbeBehavior(CardBehavior):
 # ── Spell: Twisted Image ──────────────────────────────────────────────────────
 
 class TwistedImageBehavior(CardBehavior):
+
+    def generate_actions(self, state, card_name):
+        from .action_generator import _get_creature_targets, _make_cast_action
+        from .mana import can_pay_cost
+        from .cards import get_card
+        cd = get_card(card_name)
+        if cd is None:
+            return []
+        cost = ManaCost(pip_u=cd.pip_u, generic=cd.generic_mana)
+        if not can_pay_cost(state.floating_mana, cost):
+            return []
+        actions = []
+        for t_id, t_name in _get_creature_targets(state):
+            actions.append(_make_cast_action(
+                card_name, cost, RISK_NORMAL, cd,
+                target=t_id,
+                description=f"Cast {card_name} targeting {t_name}",
+            ))
+        return actions
+
     def resolve_cast(self, state, stack_obj):
         _draw(state, 1)
         state.trace[-1].notes.append("Twisted Image: drew 1")
@@ -422,6 +502,33 @@ class TwistedImageBehavior(CardBehavior):
 # ── Spell: Repeal ─────────────────────────────────────────────────────────────
 
 class RepealBehavior(CardBehavior):
+
+    def generate_actions(self, state, card_name):
+        from .action_generator import _repeal_targets, _make_cast_action, _max_x_for
+        from .mana import can_pay_cost
+        from .cards import get_card
+        cd = get_card(card_name)
+        if cd is None:
+            return []
+        actions = []
+        max_x = _max_x_for(state, cd)
+        for x in range(0, max_x + 1):
+            cost = ManaCost(pip_u=cd.pip_u, generic=cd.generic_mana,
+                            x_cost=True, x_value=x)
+            if not can_pay_cost(state.floating_mana, cost):
+                continue
+            targets = _repeal_targets(state, x)
+            if not targets:
+                continue
+            for t_id, t_name in targets:
+                actions.append(_make_cast_action(
+                    card_name, cost, RISK_NORMAL, cd,
+                    x_value=x,
+                    target=t_id,
+                    description=f"Cast Repeal X={x} (bounce {t_name})",
+                ))
+        return actions
+
     def resolve_cast(self, state, stack_obj):
         _draw(state, 1)
         # Bounce target is handled when action is resolved
@@ -433,6 +540,37 @@ class RepealBehavior(CardBehavior):
                 state.hand.append(perm.card_name)
                 state.trace[-1].notes.append(f"Repeal bounced: {perm.card_name}")
         state.trace[-1].notes.append("Repeal: drew 1")
+
+
+# ── Spell: Mogg Salvage ───────────────────────────────────────────────────────
+
+class MoggSalvageBehavior(CardBehavior):
+
+    def generate_actions(self, state, card_name):
+        from .action_generator import _get_artifact_targets, _make_cast_action, _we_control_mountain
+        from .mana import can_pay_cost
+        from .cards import get_card
+        cd = get_card(card_name)
+        if cd is None:
+            return []
+        actions = []
+        normal_cost = ManaCost(pip_r=cd.pip_r, generic=cd.generic_mana)
+        if can_pay_cost(state.floating_mana, normal_cost):
+            for t_id, t_name in _get_artifact_targets(state):
+                actions.append(_make_cast_action(
+                    card_name, normal_cost, RISK_NORMAL, cd,
+                    target=t_id,
+                    description=f"Cast {card_name} targeting {t_name}",
+                ))
+        if state.opponent_controls_island and _we_control_mountain(state):
+            for t_id, t_name in _get_artifact_targets(state):
+                actions.append(_make_cast_action(
+                    card_name, ManaCost.zero(), RISK_SAFE, cd,
+                    alt_cost_type="mogg_salvage_free",
+                    target=t_id,
+                    description=f"Cast {card_name} for free targeting {t_name}",
+                ))
+        return actions
 
 
 # ── Spell: Strike It Rich ─────────────────────────────────────────────────────
@@ -516,14 +654,17 @@ class NullBehavior(CardBehavior):
 
 class TreasureBehavior(CardBehavior):
     def generate_mana_actions(self, state, perm):
-        return [Action(
-            action_type=SACRIFICE_FOR_MANA,
-            source_card="_Treasure",
-            description="Sacrifice Treasure token for 1 mana",
-            costs=CostBundle(sacrifice_permanent_id=perm.perm_id),
-            effects=EffectBundle(add_mana=ManaPool(ANY=1)),
-            risk_level=RISK_SAFE,
-        )]
+        return [
+            Action(
+                action_type=SACRIFICE_FOR_MANA,
+                source_card="_Treasure",
+                description=f"Sacrifice Treasure token for {{{color}}}",
+                costs=CostBundle(sacrifice_permanent_id=perm.perm_id),
+                effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
+                risk_level=RISK_SAFE,
+            )
+            for color in ("U", "R", "C")
+        ]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -533,46 +674,138 @@ def _draw(state: GameState, n: int) -> None:
     draw_cards(state, n)
 
 
-_TUTOR_PRIORITY_EXTRA_TURN = list(EXTRA_TURN_WIN_CARDS)
+# ── Counterspells ─────────────────────────────────────────────────────────────
 
-_TUTOR_PRIORITY = [
-    # Extra-turn wins
-    "Alchemist's Gambit", "Final Fortune", "Last Chance", "Warrior's Oath",
-    # Free spells and draw engines
-    "Gitaxian Probe", "Lotus Petal", "Lion's Eye Diamond", "Simian Spirit Guide",
-    "Fierce Guardianship", "Pact of Negation",
-    # Cheap noncreature spells
-    "Rite of Flame", "Mystical Tutor", "Merchant Scroll", "Solve the Equation",
-    "Gamble", "Intuition",
-    # Counterspells
-    "Force of Will", "Swan Song", "Flusterstorm", "Mental Misstep",
-]
+class CounterspellBehavior(CardBehavior):
+    """Removes the targeted stack object when this counterspell resolves."""
+
+    def resolve_cast(self, state, stack_obj):
+        if not stack_obj.targets:
+            return
+        target_id = stack_obj.targets[0]
+        target_obj = state.get_stack_object(target_id)
+        if target_obj is None:
+            return  # already resolved or removed
+
+        # Disrupting Shoal: only counters if pitched card MV (= x_value) matches target MV
+        if stack_obj.card_name == "Disrupting Shoal":
+            from .cards import get_card
+            target_cd = get_card(target_obj.card_name)
+            target_mv = target_cd.mv if target_cd else -1
+            if stack_obj.x_value != target_mv:
+                state.trace[-1].notes.append(
+                    f"Disrupting Shoal failed: pitch MV={stack_obj.x_value} "
+                    f"≠ {target_obj.card_name} MV={target_mv}"
+                )
+                return
+
+        # Counter: remove target from stack, send to graveyard (or exile if flashback)
+        state.remove_stack_object(target_id)
+        dest = "exile" if target_obj.alt_cost_used == "flashback" else "graveyard"
+        getattr(state, dest).append(target_obj.card_name)
+        state.trace[-1].notes.append(
+            f"{stack_obj.card_name} countered {target_obj.card_name} → {dest}"
+        )
 
 
-def _pick_best_tutor_target(state: GameState, tutor_type: str) -> str | None:
-    from .cards import get_card
-    in_hand = set(state.hand)
+# ── Spell: Mental Misstep ────────────────────────────────────────────────────
 
-    def eligible(name: str) -> bool:
-        if name in in_hand:
-            return False
-        cd = get_card(name)
+class MentalMisstepBehavior(CounterspellBehavior):
+
+    def generate_actions(self, state, card_name):
+        from .action_generator import (
+            _get_mv1_stack_targets, _get_any_stack_targets, _make_cast_action,
+        )
+        from .mana import can_pay_cost
+        from .cards import get_card
+        cd = get_card(card_name)
         if cd is None:
-            return False
-        if tutor_type == "instant_sorcery":
-            return cd.is_instant or cd.is_sorcery
-        if tutor_type == "blue_instant":
-            return cd.is_instant and cd.has_blue
-        return cd.is_noncreature_spell or cd.can_play_as_land
+            return []
+        actions = []
+        normal_cost = ManaCost(pip_u=cd.pip_u, generic=cd.generic_mana)
+        if can_pay_cost(state.floating_mana, normal_cost):
+            for t_id, t_name in _get_mv1_stack_targets(state):
+                actions.append(_make_cast_action(
+                    card_name, normal_cost, RISK_NORMAL, cd,
+                    target=t_id,
+                    description=f"Cast {card_name} targeting {t_name}",
+                ))
+        for t_id, t_name in _get_mv1_stack_targets(state):
+            actions.append(Action(
+                action_type=CAST_SPELL,
+                source_card=card_name,
+                description=f"Cast {card_name} (free/life) targeting {t_name}",
+                costs=CostBundle(),
+                requires_target=True,
+                target=t_id,
+                risk_level=RISK_SAFE,
+                alt_cost_type="pay_life",
+            ))
+        return actions
 
-    for priority_card in _TUTOR_PRIORITY:
-        if priority_card in state.library and eligible(priority_card):
-            return priority_card
-    # Fallback: first eligible card in library
-    for card in state.library:
-        if eligible(card):
-            return card
-    return None
+
+# ── Spell: Misdirection ───────────────────────────────────────────────────────
+
+class MisdirectionBehavior(CounterspellBehavior):
+
+    def generate_actions(self, state, card_name):
+        from .action_generator import (
+            _get_any_stack_targets, _get_single_target_stack_objects,
+            _blue_cards_in_hand_except, _make_cast_action,
+        )
+        from .mana import can_pay_cost
+        from .cards import get_card
+        cd = get_card(card_name)
+        if cd is None:
+            return []
+        actions = []
+        normal_cost = ManaCost(pip_u=cd.pip_u, generic=cd.generic_mana)
+        if can_pay_cost(state.floating_mana, normal_cost):
+            for t_id, t_name in _get_any_stack_targets(state):
+                actions.append(_make_cast_action(
+                    card_name, normal_cost, RISK_NORMAL, cd,
+                    target=t_id,
+                    description=f"Cast {card_name} targeting {t_name}",
+                ))
+        blue_pitches = _blue_cards_in_hand_except(state, card_name)
+        for pitch in blue_pitches:
+            for t_id, t_name in _get_single_target_stack_objects(state):
+                actions.append(Action(
+                    action_type=CAST_SPELL,
+                    source_card=card_name,
+                    description=f"Cast {card_name} (pitch {pitch}) targeting {t_name}",
+                    costs=CostBundle(pitched_card=pitch),
+                    requires_target=True,
+                    target=t_id,
+                    risk_level=RISK_EXPENSIVE,
+                    alt_cost_type="pitch_blue",
+                ))
+        return actions
+
+
+# ── Split card: Invert // Invent ──────────────────────────────────────────────
+
+class InvertInventBehavior(CardBehavior):
+    def resolve_cast(self, state, stack_obj):
+        if stack_obj.alt_cost_used != "invent_face":
+            return  # Invert half: swap P/T, no modeled effect
+
+        if not state.library:
+            return
+        from .state import PendingChoice
+        # Queue both tutors; instant resolves first (index 0), then sorcery.
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="instant",
+            tutor_destination="hand",
+            source_card="Invent (instant)",
+        ))
+        state.pending_choices.append(PendingChoice(
+            choice_type="tutor",
+            tutor_filter="sorcery",
+            tutor_destination="hand",
+            source_card="Invent (sorcery)",
+        ))
 
 
 # ── Registry ──────────────────────────────────────────────────────────────────
@@ -599,6 +832,7 @@ CARD_BEHAVIORS: dict[str, CardBehavior] = {
     "Intuition":           IntuitionBehavior(),
     "Gitaxian Probe":      GitaxianProbeBehavior(),
     "Twisted Image":       TwistedImageBehavior(),
+    "Mogg Salvage":        MoggSalvageBehavior(),
     "Repeal":              RepealBehavior(),
     "Strike It Rich":      StrikeItRichBehavior(),
     "Mishra's Bauble":     MishraBaubleBehavior(),
@@ -608,5 +842,19 @@ CARD_BEHAVIORS: dict[str, CardBehavior] = {
     "Tandem Lookout":      TandemLookoutBehavior(),
     "Curiosity":           CuriosityBehavior(),
     "Ophidian Eye":        OphidianEyeBehavior(),
+    "Invert / Invent":     InvertInventBehavior(),
     "_Treasure":           TreasureBehavior(),
+    # Counterspells — CounterspellBehavior removes the targeted stack object on resolution
+    "Force of Will":              CounterspellBehavior(),
+    "Fierce Guardianship":        CounterspellBehavior(),
+    "Pact of Negation":           CounterspellBehavior(),
+    "Swan Song":                  CounterspellBehavior(),
+    "Flusterstorm":               CounterspellBehavior(),
+    "Mental Misstep":             MentalMisstepBehavior(),
+    "Daze":                       CounterspellBehavior(),
+    "Snapback":                   CounterspellBehavior(),
+    "An Offer You Can't Refuse":  CounterspellBehavior(),
+    "Disrupting Shoal":           CounterspellBehavior(),
+    "Commandeer":                 CounterspellBehavior(),
+    "Misdirection":               MisdirectionBehavior(),
 }

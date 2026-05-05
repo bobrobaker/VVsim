@@ -8,7 +8,9 @@ from mtg_sim.sim.cards import load_cards, load_decklist
 from mtg_sim.sim.mana import ManaPool
 from mtg_sim.sim.runner import RunConfig, simulate_run, _build_initial_state
 from mtg_sim.sim.resolver import resolve_action, draw_cards
-from mtg_sim.sim.actions import Action, CostBundle, ManaCost, CAST_SPELL, RISK_SAFE
+from mtg_sim.sim.action_generator import generate_actions
+from mtg_sim.sim.state import ActionLog
+from mtg_sim.sim.actions import Action, CostBundle, ManaCost, CAST_SPELL, RESOLVE_STACK_OBJECT, RISK_SAFE
 from random import Random
 
 
@@ -37,9 +39,18 @@ def test_cast_free_noncreature_draws_three():
     )
     resolve_action(state, action)
 
-    # Gitaxian Probe is noncreature → should draw 3 from Curiosity
+    # Gitaxian Probe is noncreature → draw trigger placed above it on the stack
     assert state.noncreature_spells_cast == 1
-    assert len(state.hand) == hand_before - 1 + 3  # probe removed, 3 drawn
+    assert len(state.hand) == hand_before - 1  # probe removed, no draws yet
+    assert state.stack[-1].is_draw_trigger
+    assert state.stack[-1].draw_count == 3
+    assert state.pending_curiosity_draws == 3  # derived from stack
+
+    # Resolving the draw trigger delivers the cards
+    draw_act = next(a for a in generate_actions(state) if a.action_type == RESOLVE_STACK_OBJECT)
+    resolve_action(state, draw_act)
+    assert state.pending_curiosity_draws == 0
+    assert len(state.hand) == hand_before - 1 + 3
 
 
 def test_cast_increments_spell_count():

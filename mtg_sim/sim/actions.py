@@ -4,14 +4,19 @@ from typing import Optional
 from .mana import ManaCost, ManaPool
 
 # ── Action type constants ────────────────────────────────────────────────────
-INITIAL_CURIOSITY_DRAW = "INITIAL_CURIOSITY_DRAW"
-CAST_SPELL             = "CAST_SPELL"
-RESOLVE_STACK_OBJECT   = "RESOLVE_STACK_OBJECT"
-PLAY_LAND              = "PLAY_LAND"
-ACTIVATE_MANA_ABILITY  = "ACTIVATE_MANA_ABILITY"
-EXILE_FOR_MANA         = "EXILE_FOR_MANA"
-SACRIFICE_FOR_MANA     = "SACRIFICE_FOR_MANA"
-STOP                   = "STOP"
+INITIAL_CURIOSITY_DRAW    = "INITIAL_CURIOSITY_DRAW"
+CAST_SPELL                = "CAST_SPELL"
+RESOLVE_STACK_OBJECT      = "RESOLVE_STACK_OBJECT"
+PLAY_LAND                 = "PLAY_LAND"
+ACTIVATE_MANA_ABILITY     = "ACTIVATE_MANA_ABILITY"
+EXILE_FOR_MANA            = "EXILE_FOR_MANA"
+SACRIFICE_FOR_MANA        = "SACRIFICE_FOR_MANA"
+STOP                      = "STOP"
+# Resolve-time choice actions — generated when a card enters or resolves with a pending
+# player decision.  These block all other actions until resolved.
+CHOOSE_IMPRINT            = "CHOOSE_IMPRINT"   # which card to imprint on Chrome Mox
+CHOOSE_DISCARD            = "CHOOSE_DISCARD"   # which land to discard for Mox Diamond
+CHOOSE_TUTOR              = "CHOOSE_TUTOR"     # which card to fetch with a tutor spell
 
 # ── Terminal outcomes ────────────────────────────────────────────────────────
 WIN_EXTRA_TURN              = "WIN_EXTRA_TURN"
@@ -48,6 +53,7 @@ class CostBundle:
     pitch_blue_count: int = 0
     pitch_red_count: int = 0
     pitched_card: Optional[str] = None         # which card was chosen to pitch
+    pitched_card_2: Optional[str] = None       # second pitch for Commandeer
     return_land_to_hand: bool = False
     pay_life: int = 0                          # ignored in sim
     discard_land: bool = False                 # for Mox Diamond ETB
