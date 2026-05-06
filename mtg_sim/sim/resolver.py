@@ -1,11 +1,12 @@
 """Apply actions to mutate GameState."""
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from .mana import pay_cost, choose_mana_color
+from .mana import pay_cost, choose_mana_color, ManaCost
 from .actions import (
     CAST_SPELL, RESOLVE_STACK_OBJECT, PLAY_LAND,
-    ACTIVATE_MANA_ABILITY, EXILE_FOR_MANA, SACRIFICE_FOR_MANA,
-    CHOOSE_IMPRINT, CHOOSE_DISCARD, CHOOSE_TUTOR,
+    ACTIVATE_MANA_ABILITY, EXILE_FOR_MANA, SACRIFICE_FOR_MANA, FETCH_LAND,
+    CHOOSE_IMPRINT, CHOOSE_DISCARD, CHOOSE_TUTOR, CHOOSE_GRAVEYARD_RETURN, CHOOSE_LAND_TYPE,
+    ACTIVATE_TRANSMUTE,
     EXTRA_TURN_WIN_CARDS,
 )
 from .stack import StackObject
@@ -62,12 +63,20 @@ def resolve_action(state: GameState, action: Action) -> None:
         _resolve_exile_for_mana(state, action, log)
     elif action.action_type == SACRIFICE_FOR_MANA:
         _resolve_sacrifice_for_mana(state, action, log)
+    elif action.action_type == FETCH_LAND:
+        _resolve_fetch_land(state, action, log)
     elif action.action_type == CHOOSE_IMPRINT:
         _resolve_choose_imprint(state, action, log)
     elif action.action_type == CHOOSE_DISCARD:
         _resolve_choose_discard(state, action, log)
     elif action.action_type == CHOOSE_TUTOR:
         _resolve_choose_tutor(state, action, log)
+    elif action.action_type == CHOOSE_GRAVEYARD_RETURN:
+        _resolve_choose_graveyard_return(state, action, log)
+    elif action.action_type == CHOOSE_LAND_TYPE:
+        _resolve_choose_land_type(state, action, log)
+    elif action.action_type == ACTIVATE_TRANSMUTE:
+        _resolve_activate_transmute(state, action, log)
 
     log.mana_after = state.floating_mana.copy()
     log.hand_size_after = len(state.hand)
@@ -109,6 +118,21 @@ def _resolve_cast_spell(state: GameState, action: Action, log: ActionLog) -> Non
         if perm:
             state.hand.append(perm.card_name)
             log.notes.append(f"Returned {perm.card_name} to hand (Daze)")
+
+    # Sacrifice a permanent as cast cost (e.g. Thunderclap sac Mountain)
+    if action.costs.sacrifice_permanent_id:
+        perm = state.remove_perm_by_id(action.costs.sacrifice_permanent_id)
+        if perm:
+            state.graveyard.append(perm.card_name)
+            log.notes.append(f"Sacrificed {perm.card_name} as cast cost")
+
+    # Convoke: tap a creature as cast cost (alt_cost_type = "convoke:<perm_id>")
+    if action.alt_cost_type and action.alt_cost_type.startswith("convoke:"):
+        creature_id = action.alt_cost_type.split(":", 1)[1]
+        c_perm = state.get_perm_by_id(creature_id)
+        if c_perm:
+            c_perm.tapped = True
+            log.notes.append(f"Convoked {c_perm.card_name}")
 
     # Remove from hand / exile (depending on source zone)
     if action.alt_cost_type == "exile_permission":
@@ -155,6 +179,22 @@ def _resolve_cast_spell(state: GameState, action: Action, log: ActionLog) -> Non
             f"Curiosity: draw trigger ({n} draws) placed above {card_name} on stack "
             f"(noncreature cast: {state.noncreature_spells_cast})"
         )
+        # Virtue of Courage: exile top 3 and grant cast permissions
+        if state.virtue_of_courage_on_battlefield:
+            from .state import Permission
+            exiled = []
+            for _ in range(min(3, len(state.library))):
+                card = state.library.pop(0)
+                state.exile.append(card)
+                exiled.append(card)
+                state.permissions.append(Permission(
+                    card_name=card,
+                    zone="exile",
+                    action_type=CAST_SPELL,
+                    expires="end_of_turn",
+                ))
+            if exiled:
+                log.notes.append(f"Virtue of Courage: exiled {exiled} for casting")
 
 
 # ── Resolve stack object ──────────────────────────────────────────────────────
@@ -192,9 +232,13 @@ def _resolve_stack_object(state: GameState, action: Action, log: ActionLog) -> N
         beh.resolve_cast(state, obj)
 
     # Move to final zone
-    if cd and cd.is_land:
+    if cd is None:
+        pass  # triggered ability (e.g. ETB effect), no card zone transition
+    elif obj.alt_cost_used == "adventure":
+        pass  # card already moved to exile in resolve_cast
+    elif cd.is_land:
         _enter_battlefield(state, card_name, obj)
-    elif cd and (cd.is_artifact or cd.is_enchantment or cd.is_creature):
+    elif cd.is_artifact or cd.is_enchantment or cd.is_creature:
         _enter_battlefield(state, card_name, obj)
     elif obj.alt_cost_used == "flashback":
         state.exile.append(card_name)
@@ -274,6 +318,19 @@ def _resolve_activate_mana(state: GameState, action: Action, log: ActionLog) -> 
             if c_perm:
                 c_perm.tapped = True
 
+    # Paradise Mantle: equip action attaches Mantle to Vivi
+    if action.alt_cost_type and action.alt_cost_type.startswith("equip_mantle:"):
+        mantle_id = action.alt_cost_type.split(":", 1)[1]
+        mantle_perm = state.get_perm_by_id(mantle_id)
+        if mantle_perm:
+            mantle_perm.attached_to = "vivi"
+            log.notes.append("Paradise Mantle equipped to Vivi")
+        return  # no mana produced
+
+    # Paradise Mantle: tap Vivi to produce mana
+    if action.alt_cost_type == "tap_mantle_vivi":
+        state.vivi_available_as_creature_to_tap = False
+
     # Apply mana — color was already chosen at action-generation time
     state.floating_mana.add(action.effects.add_mana)
     log.event_type = "ACTIVATE_MANA"
@@ -327,11 +384,43 @@ def _resolve_sacrifice_for_mana(state: GameState, action: Action, log: ActionLog
         state.graveyard.extend(discarded)
         log.notes.append(f"LED discarded: {discarded}")
 
-    # Color was already chosen at action-generation time
+    # Pay any mana cost attached to the sacrifice (e.g. Fiery Islet draw ability)
+    mana_cost = action.costs.mana
+    zero = ManaCost.zero()
+    if mana_cost and (mana_cost.generic > 0 or mana_cost.pip_u > 0 or mana_cost.pip_r > 0):
+        state.floating_mana = pay_cost(state.floating_mana, mana_cost)
+
+    # Apply effects: mana and/or draw
     pool = action.effects.add_mana
     state.floating_mana.add(pool)
-    log.notes.append(f"Sacrificed {card_name} for {pool}")
+    draw_n = action.effects.draw_cards
+    if draw_n:
+        for _ in range(draw_n):
+            if state.library:
+                state.hand.append(state.library.pop(0))
+        log.notes.append(f"Sacrificed {card_name}: drew {draw_n}")
+    else:
+        log.notes.append(f"Sacrificed {card_name} for {pool}")
     log.event_type = "SACRIFICE"
+
+
+def _resolve_fetch_land(state: GameState, action: Action, log: ActionLog) -> None:
+    perm_id = action.costs.sacrifice_permanent_id
+    target = action.effects.fetch_target_card
+    if not perm_id or not target:
+        return
+    perm = state.remove_perm_by_id(perm_id)
+    if perm:
+        state.graveyard.append(perm.card_name)
+    if target in state.library:
+        state.library.remove(target)
+        from .cards import get_card
+        cd = get_card(target)
+        tapped = cd.land_enters_tapped == "true" if cd else False
+        new_perm = Permanent(card_name=target, tapped=tapped)
+        state.battlefield.append(new_perm)
+        log.notes.append(f"Fetched {target} from library to battlefield")
+    log.event_type = "FETCH_LAND"
 
 
 # ── Pending-choice resolvers ──────────────────────────────────────────────────
@@ -411,6 +500,49 @@ def _resolve_choose_tutor(state: GameState, action: Action, log: ActionLog) -> N
             filler = state.library.pop(0)
             state.graveyard.append(filler)
         log.notes.append("Intuition: 2 unchosen cards to graveyard")
+
+
+def _resolve_choose_graveyard_return(state: GameState, action: Action, log: ActionLog) -> None:
+    state.pending_choices = [c for c in state.pending_choices if c.choice_type != "graveyard_return"]
+    log.event_type = "CHOOSE_GRAVEYARD_RETURN"
+    card = action.source_card
+    if card and card in state.graveyard:
+        _remove_one(state.graveyard, card)
+        state.hand.append(card)
+        log.action_description = f"Return {card} from graveyard to hand"
+        log.notes.append(f"Returned {card} to hand from graveyard")
+    else:
+        log.action_description = "Graveyard return: no target"
+
+
+def _resolve_choose_land_type(state: GameState, action: Action, log: ActionLog) -> None:
+    """Store chosen basic land type (Island or Mountain) on the permanent."""
+    state.pending_choices = [c for c in state.pending_choices if c.choice_type != "land_type"]
+    log.event_type = "CHOOSE_LAND_TYPE"
+    land_type = action.source_card  # "Island" or "Mountain"
+    perm_id = action.target
+    perm = state.get_perm_by_id(perm_id or "")
+    if perm and land_type in ("Island", "Mountain"):
+        perm.counters["land_type"] = land_type
+        log.action_description = f"{perm.card_name} becomes a {land_type}"
+        log.notes.append(f"{perm.card_name} land_type set to {land_type}")
+    else:
+        log.action_description = "Choose land type: no valid target"
+
+
+def _resolve_activate_transmute(state: GameState, action: Action, log: ActionLog) -> None:
+    """Transmute: discard the card, queue an MV-filtered tutor choice. No spell cast, no Vivi trigger."""
+    card_name = action.source_card
+    log.event_type = "ACTIVATE_TRANSMUTE"
+    if card_name and card_name in state.hand:
+        state.hand.remove(card_name)
+        state.graveyard.append(card_name)
+        log.action_description = f"Transmute {card_name}"
+        log.notes.append(f"Discarded {card_name} for transmute")
+    if state.library:
+        beh = CARD_BEHAVIORS.get(card_name or "")
+        if beh and hasattr(beh, "transmute_pending_choice"):
+            state.pending_choices.append(beh.transmute_pending_choice())
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

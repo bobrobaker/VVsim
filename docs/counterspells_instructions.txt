@@ -1,0 +1,55 @@
+Task: inspect/fix Counterspells and stack interactions. Use these verified line anchors; do not broadly explore unless needed.
+
+Goal:
+- Ensure counterspells only generate legal stack-targeting actions.
+- Preserve LIFO stack resolution: only top object can resolve, but instants/counterspells may be cast while stack is nonempty.
+- Ensure Curiosity draw triggers are stack objects above the spell and are not valid counterspell targets unless intentionally modeled.
+- Ensure countered spells are removed from stack and moved to correct zone; flashback spells go to exile.
+- Check whether Misdirection/Deflecting Swat/Commandeer are currently over-modeled as counters vs target-changing/control-changing effects, and recommend the smallest safe change.
+
+Verified touch points:
+- runner.py:64-133 — simulate_run main loop: check win, generate_actions, choose action, resolve_action, post-action win check.
+- runner.py:146-154 — _check_win; currently treats extra-turn card on stack as immediate win.
+- state.py:66-87 — GameState core zones and state fields, including stack.
+- state.py:115-117 — pending_curiosity_draws sums draw-trigger stack objects.
+- state.py:143-153 — get_stack_object/remove_stack_object helpers used by counterspells.
+- stack.py:8-28 — StackObject fields/display: stack_id, targets, target_names, x_value, alt_cost_used, pitched_card, is_draw_trigger, draw_count.
+- action_generator.py:168-188 — _gen_stack_resolution_actions; LIFO only top stack object resolves.
+- action_generator.py:192-215 — _gen_cast_actions; delegates to CardBehavior.generate_actions when present.
+- action_generator.py:218-276 — _gen_normal_and_alt_cast_actions; generic normal-cast handling, including CounterspellBehavior targeting.
+- action_generator.py:279-302 — _make_cast_action; stores target/requires_target/x_value/alt_cost_type.
+- action_generator.py:320-383 — _gen_alt_cost_actions; free/pay-life, commander-free, pitch-blue, pitch-blue-blue paths.
+- action_generator.py:610-697 — stack target helpers: _get_any_stack_targets, _get_typed_stack_targets, _get_single_target_stack_objects, _get_mv1_stack_targets, _stack_object_mv/_by_name.
+- resolver.py:87-164 — _resolve_cast_spell; pays costs, removes card from zone, creates StackObject, appends Curiosity draw trigger.
+- resolver.py:171-214 — _resolve_stack_object; removes stack object, resolves draw triggers, calls card-specific resolve_cast, moves spell to final zone.
+- resolver.py:504-518 — _lookup_target_name; maps stack/permanent target IDs to readable names.
+- card_behaviors.py:803-839 — CounterspellBehavior; get_stack_targets + resolve_cast removes targeted stack object and zones it.
+- card_behaviors.py:844-877 — MentalMisstepBehavior; normal and pay-life targeting MV=1 stack objects.
+- card_behaviors.py:880-916 — MisdirectionBehavior; normal/pitch targeting; currently inherits CounterspellBehavior.
+- card_behaviors.py:919-955 — DazeBehavior; normal and return-island alt cost.
+- card_behaviors.py:958-976 — PactOfNegationBehavior; free targeting.
+- card_behaviors.py:979-1028 — DisruptingShoalBehavior; X and pitch MV logic.
+- card_behaviors.py:1395-1435+ — CARD_BEHAVIORS registry; counterspell-like card registration begins here.
+
+Likely issues to inspect:
+1. Draw triggers should probably not be counterspell targets. Current stack helpers filter out obj.is_draw_trigger; preserve unless intentionally changing the model.
+2. Some generic/alt-cost paths use _get_any_stack_targets directly. Check whether card-specific target filters are being bypassed.
+3. Misdirection inherits CounterspellBehavior, so it likely counters/removes the target instead of changing a target. Recommend the smallest sim-appropriate treatment.
+4. Commandeer is registered as CounterspellBehavior, but it is not a counterspell in real rules.
+5. Deflecting Swat appears in the deck/card data but may not be registered in CARD_BEHAVIORS. Check whether it falls through generic alt-cost behavior and whether resolution is modeled.
+6. Countering a spell after its Curiosity trigger was created should leave the draw trigger intact.
+7. Countered flashback spells should move to exile; non-flashback countered spells should move to graveyard.
+
+Suggested focused tests:
+- LIFO: only top stack object gets RESOLVE_STACK_OBJECT action.
+- Instants/counterspells can be cast while stack is nonempty.
+- Curiosity draw trigger is not a legal counterspell target.
+- Countering a spell removes that spell from stack and puts it in graveyard.
+- Countering a flashback spell puts it in exile.
+- Countering a spell does not remove the already-created Curiosity draw trigger.
+- Mental Misstep only targets MV=1 stack objects.
+- Swan Song targets only instant/sorcery/enchantment stack objects.
+- Flusterstorm targets only instant/sorcery stack objects.
+- Daze alt cost returns an untapped Island to hand.
+- Disrupting Shoal only successfully counters when X/pitched MV equals target MV.
+- Misdirection/Commandeer/Deflecting Swat are either modeled explicitly or intentionally disabled/simplified with comments/tests.

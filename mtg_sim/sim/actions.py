@@ -11,12 +11,16 @@ PLAY_LAND                 = "PLAY_LAND"
 ACTIVATE_MANA_ABILITY     = "ACTIVATE_MANA_ABILITY"
 EXILE_FOR_MANA            = "EXILE_FOR_MANA"
 SACRIFICE_FOR_MANA        = "SACRIFICE_FOR_MANA"
+FETCH_LAND                = "FETCH_LAND"
 STOP                      = "STOP"
 # Resolve-time choice actions — generated when a card enters or resolves with a pending
 # player decision.  These block all other actions until resolved.
 CHOOSE_IMPRINT            = "CHOOSE_IMPRINT"   # which card to imprint on Chrome Mox
 CHOOSE_DISCARD            = "CHOOSE_DISCARD"   # which land to discard for Mox Diamond
 CHOOSE_TUTOR              = "CHOOSE_TUTOR"     # which card to fetch with a tutor spell
+CHOOSE_GRAVEYARD_RETURN   = "CHOOSE_GRAVEYARD_RETURN"  # which instant/sorcery to return from graveyard to hand
+CHOOSE_LAND_TYPE          = "CHOOSE_LAND_TYPE"        # Island or Mountain for Multiversal Passage / Thran Portal
+ACTIVATE_TRANSMUTE        = "ACTIVATE_TRANSMUTE"      # transmute activated ability: discard card, queue MV tutor
 
 # ── Terminal outcomes ────────────────────────────────────────────────────────
 WIN_EXTRA_TURN              = "WIN_EXTRA_TURN"
@@ -70,6 +74,7 @@ class EffectBundle:
     bounce_permanent_id: Optional[str] = None
     is_win: bool = False
     counter_target_id: Optional[str] = None   # stack_id to counter
+    fetch_target_card: Optional[str] = None   # land name to fetch from library
 
 
 @dataclass

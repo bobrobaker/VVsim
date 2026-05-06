@@ -21,7 +21,9 @@ def _load():
     return build_active_deck()
 
 
-def _state_with_hand(hand, mana, cards):
+def _state_with_hand(hand, mana, cards=None):
+    if cards is None:
+        cards = _load()
     cfg = RunConfig(seed=1, starting_hand=hand, starting_floating_mana=mana)
     rng = Random(1)
     state = _build_initial_state(cfg, cards, rng)
@@ -195,3 +197,365 @@ def test_disrupting_shoal_targets_all_spells_not_just_mv_match():
     # With LIFO, only top of stack (Jeska's Will) can be targeted via _get_any_stack_targets
     # Actually _get_any_stack_targets returns all stack objects; Shoal can target any
     assert mv3_obj.stack_id in targeted_ids, "Shoal should be able to target MV=3 spell"
+
+
+# ── Curiosity draw trigger is not a counterspell target ───────────────────────
+
+def test_draw_trigger_not_a_counterspell_target():
+    cards = _load()
+    state = _state_with_hand(["Force of Will", "Pact of Negation"], ManaPool(U=1), cards)
+    from mtg_sim.sim.stack import StackObject
+    # Push a draw trigger onto the stack
+    draw_trig = StackObject(card_name="_draw_trigger", is_draw_trigger=True, draw_count=1)
+    state.stack.append(draw_trig)
+    actions = generate_actions(state)
+    fow_acts = [a for a in actions if a.source_card == "Force of Will" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in fow_acts}
+    assert draw_trig.stack_id not in targeted_ids, "Draw trigger should not be a legal counterspell target"
+
+
+# ── LIFO: only top stack object gets RESOLVE_STACK_OBJECT action ──────────────
+
+def test_lifo_only_top_resolves():
+    cards = _load()
+    state = _state_with_hand([], ManaPool(), cards)
+    bottom = _push_spell(state, "Gamble")
+    top = _push_spell(state, "Rite of Flame")
+    actions = generate_actions(state)
+    resolve_acts = [a for a in actions if a.action_type == RESOLVE_STACK_OBJECT]
+    assert len(resolve_acts) == 1
+    assert resolve_acts[0].target == top.stack_id, "Only top stack object should be resolvable"
+
+
+# ── Instants can be cast while stack is nonempty ──────────────────────────────
+
+def test_instant_castable_with_stack():
+    cards = _load()
+    state = _state_with_hand(["Pact of Negation"], ManaPool(), cards)
+    _push_spell(state, "Gamble")  # stack is nonempty
+    actions = generate_actions(state)
+    pact_acts = [a for a in actions if a.source_card == "Pact of Negation" and a.action_type == CAST_SPELL]
+    assert len(pact_acts) >= 1, "Instant should be castable while stack is nonempty"
+
+
+# ── An Offer You Can't Refuse ─────────────────────────────────────────────────
+
+def _resolve_top(state):
+    """Helper: resolve the top stack object."""
+    acts = generate_actions(state)
+    act = next(a for a in acts if a.action_type == RESOLVE_STACK_OBJECT)
+    resolve_action(state, act)
+
+
+def test_an_offer_only_targets_noncreature():
+    cards = _load()
+    state = _state_with_hand(["An Offer You Can't Refuse"], ManaPool(U=1), cards)
+    inst = _push_spell(state, "Rite of Flame")   # sorcery, noncreature ✓
+    # Vivi is a creature but not on stack; push a creature spell to stack to test filter
+    from mtg_sim.sim.stack import StackObject
+    from mtg_sim.sim.cards import get_card
+    # Use Hullbreaker Horror as a creature spell placeholder on stack
+    creature_obj = StackObject(card_name="Hullbreaker Horror")
+    state.stack.append(creature_obj)
+    actions = generate_actions(state)
+    offer_acts = [a for a in actions if a.source_card == "An Offer You Can't Refuse" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in offer_acts}
+    assert inst.stack_id in targeted_ids, "Should target noncreature spell"
+    assert creature_obj.stack_id not in targeted_ids, "Should not target creature spell"
+
+
+def test_an_offer_creates_treasures():
+    cards = _load()
+    state = _state_with_hand(["An Offer You Can't Refuse"], ManaPool(U=1), cards)
+    target = _push_spell(state, "Rite of Flame")
+    resolve_action(state, next(a for a in generate_actions(state)
+                               if a.source_card == "An Offer You Can't Refuse" and a.action_type == CAST_SPELL))
+    # Resolve draw trigger then the counterspell
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # An Offer You Can't Refuse
+    assert "Rite of Flame" in state.graveyard, "Target should be countered"
+    treasures = [p for p in state.battlefield if p.card_name == "_Treasure"]
+    assert len(treasures) == 2, "Should create 2 Treasure tokens"
+
+
+# ── Commandeer ────────────────────────────────────────────────────────────────
+
+def test_commandeer_only_targets_noncreature():
+    cards = _load()
+    # Commandeer pitch requires two blue cards
+    state = _state_with_hand(["Commandeer", "Force of Will", "Pact of Negation"], ManaPool(), cards)
+    inst = _push_spell(state, "Rite of Flame")
+    creature_obj = StackObject(card_name="Hullbreaker Horror")
+    state.stack.append(creature_obj)
+    actions = generate_actions(state)
+    cmd_acts = [a for a in actions if a.source_card == "Commandeer" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in cmd_acts}
+    assert inst.stack_id in targeted_ids, "Commandeer should target noncreature spells"
+    assert creature_obj.stack_id not in targeted_ids, "Commandeer should not target creature spells"
+
+
+def test_commandeer_does_not_counter_target():
+    cards = _load()
+    state = _state_with_hand(["Commandeer", "Force of Will", "Pact of Negation"], ManaPool(), cards)
+    target = _push_spell(state, "Rite of Flame")
+    acts = generate_actions(state)
+    cmd_act = next((a for a in acts if a.source_card == "Commandeer" and a.action_type == CAST_SPELL
+                    and a.target == target.stack_id), None)
+    assert cmd_act is not None, "Commandeer should generate an action"
+    resolve_action(state, cmd_act)
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # Commandeer
+    assert any(o.card_name == "Rite of Flame" for o in state.stack), \
+        "Target should remain on stack (not countered)"
+
+
+def test_commandeer_pitch_exiles_pitched_cards():
+    cards = _load()
+    state = _state_with_hand(["Commandeer", "Force of Will", "Pact of Negation"], ManaPool(), cards)
+    target = _push_spell(state, "Rite of Flame")
+    acts = generate_actions(state)
+    pitch_acts = [a for a in acts if a.source_card == "Commandeer"
+                  and a.action_type == CAST_SPELL and a.alt_cost_type == "pitch_blue_blue"]
+    assert len(pitch_acts) >= 1, "Commandeer should generate pitch-two-blue actions"
+    act = pitch_acts[0]
+    resolve_action(state, act)
+    assert act.costs.pitched_card in state.exile, "First pitched card should go to exile"
+    assert act.costs.pitched_card_2 in state.exile, "Second pitched card should go to exile"
+
+
+# ── Deflecting Swat ───────────────────────────────────────────────────────────
+
+def test_deflecting_swat_free_with_vivi():
+    cards = _load()
+    state = _state_with_hand(["Deflecting Swat"], ManaPool(), cards)
+    # Put a spell with a target on the stack (use a counterspell targeting something)
+    from mtg_sim.sim.stack import StackObject
+    target_of_spell = _push_spell(state, "Gamble")
+    spell_with_target = StackObject(card_name="Force of Will", targets=[target_of_spell.stack_id])
+    state.stack.append(spell_with_target)
+    state.vivi_on_battlefield = True
+    actions = generate_actions(state)
+    swat_acts = [a for a in actions if a.source_card == "Deflecting Swat" and a.action_type == CAST_SPELL]
+    assert any(a.alt_cost_type == "commander_free" for a in swat_acts), \
+        "Deflecting Swat should be free with Vivi"
+
+
+def test_deflecting_swat_no_action_without_target():
+    cards = _load()
+    state = _state_with_hand(["Deflecting Swat"], ManaPool(), cards)
+    # Stack is empty: no targets
+    actions = generate_actions(state)
+    swat_acts = [a for a in actions if a.source_card == "Deflecting Swat" and a.action_type == CAST_SPELL]
+    assert len(swat_acts) == 0, "No Deflecting Swat action without a legal target"
+
+
+def test_deflecting_swat_does_not_counter_target():
+    cards = _load()
+    state = _state_with_hand(["Deflecting Swat"], ManaPool(R=3))
+    from mtg_sim.sim.stack import StackObject
+    inner = _push_spell(state, "Gamble")
+    outer = StackObject(card_name="Force of Will", targets=[inner.stack_id])
+    state.stack.append(outer)
+    state.vivi_on_battlefield = True
+    acts = generate_actions(state)
+    swat_act = next((a for a in acts if a.source_card == "Deflecting Swat"), None)
+    assert swat_act is not None
+    resolve_action(state, swat_act)
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # Deflecting Swat
+    assert any(o.card_name == "Force of Will" for o in state.stack), \
+        "Target should remain on stack (not countered)"
+
+
+# ── Fierce Guardianship ───────────────────────────────────────────────────────
+
+def test_fierce_guardianship_only_targets_noncreature():
+    cards = _load()
+    state = _state_with_hand(["Fierce Guardianship"], ManaPool())
+    creature_obj = StackObject(card_name="Hullbreaker Horror")
+    state.stack.append(creature_obj)
+    state.vivi_on_battlefield = True
+    actions = generate_actions(state)
+    fg_acts = [a for a in actions if a.source_card == "Fierce Guardianship" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in fg_acts}
+    assert creature_obj.stack_id not in targeted_ids, "Fierce Guardianship should not target creature spells"
+
+
+def test_fierce_guardianship_free_with_vivi():
+    cards = _load()
+    state = _state_with_hand(["Fierce Guardianship"], ManaPool())
+    target = _push_spell(state, "Rite of Flame")
+    state.vivi_on_battlefield = True
+    actions = generate_actions(state)
+    fg_acts = [a for a in actions if a.source_card == "Fierce Guardianship" and a.action_type == CAST_SPELL]
+    assert any(a.alt_cost_type == "commander_free" for a in fg_acts), \
+        "Fierce Guardianship should be free with Vivi"
+
+
+def test_fierce_guardianship_counters_target():
+    cards = _load()
+    state = _state_with_hand(["Fierce Guardianship"], ManaPool())
+    target = _push_spell(state, "Rite of Flame")
+    state.vivi_on_battlefield = True
+    act = next(a for a in generate_actions(state) if a.source_card == "Fierce Guardianship" and a.action_type == CAST_SPELL)
+    resolve_action(state, act)
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # Fierce Guardianship
+    assert "Rite of Flame" in state.graveyard
+    assert not any(o.card_name == "Rite of Flame" for o in state.stack)
+
+
+# ── Misdirection ──────────────────────────────────────────────────────────────
+
+def test_misdirection_does_not_counter_target():
+    cards = _load()
+    state = _state_with_hand(["Misdirection", "Force of Will"], ManaPool())
+    inner = _push_spell(state, "Gamble")
+    outer = StackObject(card_name="Pact of Negation", targets=[inner.stack_id])
+    state.stack.append(outer)
+    # Misdirection via pitch-blue targeting outer (which has one target)
+    acts = generate_actions(state)
+    misd_acts = [a for a in acts if a.source_card == "Misdirection" and a.action_type == CAST_SPELL]
+    assert len(misd_acts) >= 1, "Misdirection should generate actions"
+    resolve_action(state, misd_acts[0])
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # Misdirection
+    assert any(o.card_name == "Pact of Negation" for o in state.stack), \
+        "Misdirection should not counter its target"
+
+
+def test_misdirection_only_targets_single_target_spells():
+    cards = _load()
+    state = _state_with_hand(["Misdirection", "Force of Will"], ManaPool())
+    no_target_spell = _push_spell(state, "Rite of Flame")  # has no targets
+    acts = generate_actions(state)
+    misd_acts = [a for a in acts if a.source_card == "Misdirection" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in misd_acts}
+    assert no_target_spell.stack_id not in targeted_ids, \
+        "Misdirection should not target spells without targets"
+
+
+# ── Pyroblast ─────────────────────────────────────────────────────────────────
+
+def test_pyroblast_targets_blue_spell():
+    cards = _load()
+    state = _state_with_hand(["Pyroblast"], ManaPool(R=1))
+    blue_spell = _push_spell(state, "Force of Will")  # blue spell
+    red_spell = _push_spell(state, "Rite of Flame")   # red, not blue
+    acts = generate_actions(state)
+    pyro_acts = [a for a in acts if a.source_card == "Pyroblast" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in pyro_acts}
+    assert blue_spell.stack_id in targeted_ids, "Pyroblast should target blue spells"
+    assert red_spell.stack_id not in targeted_ids, "Pyroblast should not target non-blue spells"
+
+
+def test_pyroblast_counters_blue_spell():
+    cards = _load()
+    state = _state_with_hand(["Pyroblast"], ManaPool(R=1))
+    target = _push_spell(state, "Force of Will")
+    act = next(a for a in generate_actions(state) if a.source_card == "Pyroblast" and a.action_type == CAST_SPELL)
+    resolve_action(state, act)
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # Pyroblast
+    assert "Force of Will" in state.graveyard
+    assert not any(o.card_name == "Force of Will" for o in state.stack)
+
+
+# ── Mental Misstep targets only MV=1 ─────────────────────────────────────────
+
+def test_mental_misstep_only_mv1():
+    cards = _load()
+    state = _state_with_hand(["Mental Misstep"], ManaPool())
+    mv1 = _push_spell(state, "Twisted Image")   # MV=1
+    mv3 = _push_spell(state, "Jeska's Will")    # MV=3
+    acts = generate_actions(state)
+    mm_acts = [a for a in acts if a.source_card == "Mental Misstep" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in mm_acts}
+    assert mv1.stack_id in targeted_ids, "Mental Misstep should target MV=1 spells"
+    assert mv3.stack_id not in targeted_ids, "Mental Misstep should not target MV=3 spells"
+
+
+# ── Swan Song targets only enchantment/instant/sorcery ───────────────────────
+
+def test_swan_song_filter():
+    cards = _load()
+    state = _state_with_hand(["Swan Song"], ManaPool(U=1))
+    inst = _push_spell(state, "Rite of Flame")   # sorcery ✓
+    creature_obj = StackObject(card_name="Hullbreaker Horror")
+    state.stack.append(creature_obj)
+    acts = generate_actions(state)
+    ss_acts = [a for a in acts if a.source_card == "Swan Song" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in ss_acts}
+    assert inst.stack_id in targeted_ids, "Swan Song should target sorceries"
+    assert creature_obj.stack_id not in targeted_ids, "Swan Song should not target creature spells"
+
+
+# ── Flusterstorm targets only instant/sorcery ────────────────────────────────
+
+def test_flusterstorm_filter():
+    cards = _load()
+    state = _state_with_hand(["Flusterstorm"], ManaPool(U=1))
+    inst = _push_spell(state, "Rite of Flame")   # sorcery ✓
+    # Curiosity is an enchantment — should be excluded
+    from mtg_sim.sim.stack import StackObject
+    ench_obj = StackObject(card_name="Curiosity")
+    state.stack.append(ench_obj)
+    acts = generate_actions(state)
+    fl_acts = [a for a in acts if a.source_card == "Flusterstorm" and a.action_type == CAST_SPELL]
+    targeted_ids = {a.target for a in fl_acts}
+    assert inst.stack_id in targeted_ids, "Flusterstorm should target sorceries"
+    assert ench_obj.stack_id not in targeted_ids, "Flusterstorm should not target enchantments"
+
+
+# ── Daze alt cost returns island ──────────────────────────────────────────────
+
+def test_daze_alt_cost_returns_island():
+    cards = _load()
+    from mtg_sim.sim.state import Permanent
+    state = _state_with_hand(["Daze"], ManaPool())
+    # Put an untapped Island on battlefield
+    island = Permanent(card_name="Island", tapped=False)
+    state.battlefield.append(island)
+    target = _push_spell(state, "Rite of Flame")
+    acts = generate_actions(state)
+    daze_acts = [a for a in acts if a.source_card == "Daze" and a.action_type == CAST_SPELL]
+    alt_acts = [a for a in daze_acts if a.alt_cost_type == "return_island"]
+    assert len(alt_acts) >= 1, "Daze should generate return-island alt cost action"
+
+
+# ── Countered flashback spell goes to exile ───────────────────────────────────
+
+def test_countered_flashback_goes_to_exile():
+    cards = _load()
+    state = _state_with_hand(["Force of Will", "Pact of Negation"], ManaPool(U=1))
+    # Simulate a flashback spell on stack
+    flash_obj = StackObject(card_name="Gamble", alt_cost_used="flashback")
+    state.stack.append(flash_obj)
+    act = next(a for a in generate_actions(state) if a.source_card == "Force of Will"
+               and a.action_type == CAST_SPELL and a.target == flash_obj.stack_id)
+    resolve_action(state, act)
+    _resolve_top(state)  # draw trigger
+    _resolve_top(state)  # Force of Will
+    assert "Gamble" in state.exile, "Countered flashback spell should go to exile"
+    assert "Gamble" not in state.graveyard
+
+
+# ── Countering a spell preserves already-created Curiosity draw trigger ───────
+
+def test_countering_preserves_draw_trigger():
+    cards = _load()
+    state = _state_with_hand(["Pact of Negation"], ManaPool())
+    target = _push_spell(state, "Rite of Flame")
+    # Manually add a draw trigger as if Curiosity fired for target
+    draw_trig = StackObject(card_name="_draw_trigger", is_draw_trigger=True, draw_count=1)
+    state.stack.append(draw_trig)
+    # Cast Pact of Negation targeting Rite of Flame
+    act = next(a for a in generate_actions(state) if a.source_card == "Pact of Negation"
+               and a.action_type == CAST_SPELL and a.target == target.stack_id)
+    resolve_action(state, act)
+    # Resolve Pact (on top)
+    _resolve_top(state)  # Pact draw trigger
+    _resolve_top(state)  # Pact of Negation
+    # Draw trigger for Rite should still be on stack
+    assert any(o.is_draw_trigger for o in state.stack), \
+        "Curiosity draw trigger should survive after target is countered"

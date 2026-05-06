@@ -40,10 +40,11 @@ class PendingChoice:
     """A player decision that must be resolved before the game can continue."""
     choice_type: str              # "imprint" | "discard" | "tutor"
     perm_id: str = ""             # for imprint/discard: perm needing the choice
-    tutor_filter: str = "any"     # for tutor: "any" | "instant_sorcery" | "blue_instant"
+    tutor_filter: str = "any"     # for tutor: "any" | "instant_sorcery" | "blue_instant" | "mv=1" | "mv=3" | "creature_power_lte2"
     tutor_destination: str = "hand"  # for tutor: "hand" | "top"
     source_card: str = ""         # which spell/card created this choice (for display)
     post_effect: str = ""         # optional follow-up: "gamble_discard"
+    preferred_targets: list = None  # ordering hint; preferred cards appear first in action list
 
 
 @dataclass
@@ -92,20 +93,24 @@ class GameState:
 
     # For Jeska's Will exile-cast permissions
     jeska_opponent_hand_size: int = 7
+    virtue_of_courage_on_battlefield: bool = False
 
     # Assumption: does opponent control an island? (affects Mogg Salvage free cost)
     opponent_controls_island: bool = True
 
-    # Stable dummy permanents representing opponent creatures/artifacts for targeting.
+    # Stable dummy permanents representing opponent creatures/artifacts/lands for targeting.
     # These are never on state.battlefield; they exist only as valid target placeholders.
     _opponent_creature_perm: Optional["Permanent"] = field(default=None, repr=False)
     _opponent_artifact_perm: Optional["Permanent"] = field(default=None, repr=False)
+    _opponent_land_perm: Optional["Permanent"] = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self._opponent_creature_perm is None:
             self._opponent_creature_perm = Permanent(card_name="_opponent_creature")
         if self._opponent_artifact_perm is None:
             self._opponent_artifact_perm = Permanent(card_name="_opponent_artifact")
+        if self._opponent_land_perm is None:
+            self._opponent_land_perm = Permanent(card_name="_opponent_land")
 
     @property
     def pending_curiosity_draws(self) -> int:
@@ -126,6 +131,8 @@ class GameState:
             return self._opponent_creature_perm
         if self._opponent_artifact_perm and self._opponent_artifact_perm.perm_id == perm_id:
             return self._opponent_artifact_perm
+        if self._opponent_land_perm and self._opponent_land_perm.perm_id == perm_id:
+            return self._opponent_land_perm
         return None
 
     def remove_perm_by_id(self, perm_id: str) -> Optional[Permanent]:

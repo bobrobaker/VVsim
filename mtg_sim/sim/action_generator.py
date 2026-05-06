@@ -6,7 +6,7 @@ from .actions import (
     Action, CostBundle, EffectBundle,
     CAST_SPELL, RESOLVE_STACK_OBJECT, PLAY_LAND,
     ACTIVATE_MANA_ABILITY, EXILE_FOR_MANA,
-    CHOOSE_TUTOR,
+    CHOOSE_TUTOR, CHOOSE_LAND_TYPE,
     RISK_SAFE, RISK_NORMAL, RISK_EXPENSIVE, RISK_RISKY, RISK_DESPERATE,
     EXTRA_TURN_WIN_CARDS, NONCREATURE_SPELL_WIN_THRESHOLD,
 )
@@ -46,6 +46,7 @@ def generate_actions(state: GameState) -> list[Action]:
     actions += _gen_cast_from_exile_actions(state)
     actions += _gen_land_play_actions(state)
     actions += _gen_mana_actions(state)
+    actions += _gen_activate_actions(state)
     actions += _gen_special_hand_actions(state)
     return actions
 
@@ -65,22 +66,70 @@ def _gen_pending_choice_actions(state: GameState) -> list[Action]:
         return []
 
     actions: list[Action] = []
+    if choice.choice_type == "graveyard_return":
+        from .actions import CHOOSE_GRAVEYARD_RETURN
+        seen: set[str] = set()
+        for card in state.graveyard:
+            if card in seen:
+                continue
+            cd = get_card(card)
+            if cd and _tutor_filter_matches(cd, choice.tutor_filter or "instant_sorcery"):
+                seen.add(card)
+                actions.append(Action(
+                    action_type=CHOOSE_GRAVEYARD_RETURN,
+                    source_card=card,
+                    description=f"{choice.source_card}: return {card} to hand",
+                    risk_level=RISK_NORMAL,
+                ))
+        if not actions:
+            # No legal targets; skip the choice
+            actions.append(Action(
+                action_type=CHOOSE_GRAVEYARD_RETURN,
+                source_card=None,
+                description=f"{choice.source_card}: no graveyard target (skip)",
+                risk_level=RISK_SAFE,
+            ))
+        return actions
+
+    if choice.choice_type == "land_type":
+        return [
+            Action(
+                action_type=CHOOSE_LAND_TYPE,
+                source_card=land_type,
+                description=f"{choice.source_card}: choose {land_type}",
+                target=choice.perm_id,
+                risk_level=RISK_SAFE,
+            )
+            for land_type in ("Island", "Mountain")
+        ]
+
     if choice.choice_type == "tutor":
+        preferred = list(choice.preferred_targets or [])
         in_hand = set(state.hand)
         seen: set[str] = set()
+        preferred_actions: list[Action] = []
+        other_actions: list[Action] = []
         for card in state.library:
             if card in seen or card in in_hand:
                 continue
             cd = get_card(card)
             if cd and _tutor_filter_matches(cd, choice.tutor_filter):
                 seen.add(card)
-                actions.append(Action(
+                act = Action(
                     action_type=CHOOSE_TUTOR,
                     source_card=card,
                     description=f"{choice.source_card}: tutor {card}",
                     alt_cost_type=choice.tutor_destination,
                     risk_level=RISK_NORMAL,
-                ))
+                )
+                if card in preferred:
+                    preferred_actions.append(act)
+                else:
+                    other_actions.append(act)
+        # Sort preferred by their order in the preferred_targets list
+        preferred_actions.sort(key=lambda a: preferred.index(a.source_card))
+        actions.extend(preferred_actions)
+        actions.extend(other_actions)
 
     return actions
 
@@ -94,7 +143,25 @@ def _tutor_filter_matches(cd, tutor_filter: str) -> bool:
         return cd.is_instant
     if tutor_filter == "sorcery":
         return cd.is_sorcery
+    if tutor_filter == "mv=1":
+        return cd.mv == 1
+    if tutor_filter == "mv=3":
+        return cd.mv == 3
+    if tutor_filter == "creature_power_lte2":
+        return cd.is_creature and cd.name in _POWER_LTE2_CREATURES
     return cd.is_noncreature_spell or cd.can_play_as_land
+
+
+# Creatures in the deck with power <= 2; used by Imperial Recruiter filter.
+_POWER_LTE2_CREATURES = {
+    "Vivi Ornitier",
+    "Drift of Phantasms",
+    "Imperial Recruiter",
+    "Pinnacle Monk / Mystic Peak",
+    "Ragavan, Nimble Pilferer",
+    "Simian Spirit Guide",
+    "Tandem Lookout",
+}
 
 
 # ── Stack resolution ──────────────────────────────────────────────────────────
@@ -146,6 +213,17 @@ def _gen_cast_actions(state: GameState) -> list[Action]:
         else:
             actions += _gen_normal_and_alt_cast_actions(state, card_name, cd)
 
+    # Graveyard: generate flashback (and other graveyard-cast alt costs) separately
+    seen_gy: set[str] = set()
+    for card_name in state.graveyard:
+        if card_name in seen_gy or card_name in seen:
+            continue
+        seen_gy.add(card_name)
+        cd = get_card(card_name)
+        if cd is None or cd.is_land or not cd.alt_costs or "flashback" not in cd.alt_costs:
+            continue
+        actions += _gen_normal_and_alt_cast_actions(state, card_name, cd)
+
     return actions
 
 
@@ -174,11 +252,12 @@ def _gen_normal_and_alt_cast_actions(state: GameState, card_name: str, cd) -> li
 
     # ── Normal cast ──────────────────────────────────────────────────────────
     # Counterspells cast for their normal mana cost require a stack target.
-    is_counterspell = isinstance(CARD_BEHAVIORS.get(card_name), CounterspellBehavior)
+    counterspell_beh = CARD_BEHAVIORS.get(card_name)
+    is_counterspell = isinstance(counterspell_beh, CounterspellBehavior)
     if is_counterspell:
-        # Generate one action per stack target; fall through to alt costs below
+        # Generate one action per legal stack target; fall through to alt costs below
         if can_pay_cost(state.floating_mana, normal_cost):
-            for t_id, t_name in _get_any_stack_targets(state):
+            for t_id, t_name in counterspell_beh.get_stack_targets(state):
                 actions.append(_make_cast_action(
                     card_name, normal_cost, risk, cd,
                     target=t_id,
@@ -329,79 +408,17 @@ def _gen_alt_cost_actions(state: GameState, card_name: str, cd, tok: str) -> lis
                 alt_cost_type="pitch_red",
             ))
 
-    # ── free:return_island  (Daze) ────────────────────────────────────────────
-    elif tok.startswith("free:return_island"):
-        islands = _islands_on_battlefield(state)
-        if islands:
-            spell_targets = _get_any_stack_targets(state)
-            for t_id, t_name in spell_targets:
-                actions.append(Action(
-                    action_type=CAST_SPELL,
-                    source_card="Daze",
-                    description=f"Cast Daze (return island) targeting {t_name}",
-                    costs=CostBundle(return_land_to_hand=True,
-                                     tap_permanent_id=islands[0].perm_id),
-                    requires_target=True,
-                    target=t_id,
-                    risk_level=RISK_EXPENSIVE,
-                    alt_cost_type="return_island",
-                ))
-
-    # ── free:delayed_upkeep_cost  (Pact of Negation) ─────────────────────────
-    elif tok.startswith("free:delayed_upkeep_cost"):
-        spell_targets = _get_any_stack_targets(state)
-        for t_id, t_name in spell_targets:
-            actions.append(Action(
-                action_type=CAST_SPELL,
-                source_card="Pact of Negation",
-                description=f"Cast Pact of Negation (free) targeting {t_name}",
-                costs=CostBundle(),
-                requires_target=True,
-                target=t_id,
-                risk_level=RISK_NORMAL,
-                alt_cost_type="delayed_upkeep",
-            ))
-
-    # ── alt_x:pitch_blue_mv  (Disrupting Shoal) ──────────────────────────────
-    elif tok.startswith("alt_x:pitch_blue_mv"):
-        # Pitch any blue card; X = pitch card's MV. Counter succeeds only if X == target MV
-        # (the MV check is enforced at resolution in CounterspellBehavior, not here)
-        pitches = _blue_cards_in_hand_except(state, card_name)
-        for pitch in pitches:
-            pitch_mv = _stack_object_mv_by_name(pitch)
-            for t_id, t_name in _get_any_stack_targets(state):
-                actions.append(Action(
-                    action_type=CAST_SPELL,
-                    source_card=card_name,
-                    description=f"Cast {card_name} (pitch {pitch}) targeting {t_name}",
-                    costs=CostBundle(pitched_card=pitch),
-                    requires_target=True,
-                    target=t_id,
-                    risk_level=RISK_EXPENSIVE,
-                    alt_cost_type="pitch_blue_x",
-                    x_value=pitch_mv,
-                ))
-
-    # ── alt_x:pitch_red_mv  (Blazing Shoal) ──────────────────────────────────
-    elif tok.startswith("alt_x:pitch_red_mv"):
-        # Pitch any red card; X = pitched card's MV; no MV restriction on which card to pitch
-        red_pitches = _red_cards_in_hand_except(state, card_name)
-        for pitch in red_pitches:
-            pitch_mv = _stack_object_mv_by_name(pitch)
-            actions.append(Action(
-                action_type=CAST_SPELL,
-                source_card=card_name,
-                description=f"Cast {card_name} (pitch {pitch}, X={pitch_mv})",
-                costs=CostBundle(pitched_card=pitch),
-                risk_level=RISK_RISKY,
-                alt_cost_type="pitch_red_x",
-                x_value=pitch_mv,
-            ))
-
-    # ── alt:flashback_2R  (Strike It Rich) ───────────────────────────────────
-    elif tok.startswith("alt:flashback_2R"):
+    # ── alt:flashback_COST  (e.g. Strike It Rich: alt:flashback_2R) ─────────
+    elif tok.startswith("alt:flashback_"):
+        cost_str = tok[len("alt:flashback_"):]
+        pip_u_fb = cost_str.count("U")
+        pip_r_fb = cost_str.count("R")
+        generic_fb = 0
+        for ch in cost_str:
+            if ch.isdigit():
+                generic_fb = generic_fb * 10 + int(ch)
+        cost = ManaCost(pip_u=pip_u_fb, pip_r=pip_r_fb, generic=generic_fb)
         if card_name in state.graveyard:
-            cost = ManaCost(pip_r=1, generic=2)
             if can_pay_cost(state.floating_mana, cost):
                 actions.append(Action(
                     action_type=CAST_SPELL,
@@ -587,6 +604,17 @@ def _default_mana_actions(state: GameState, perm, cd) -> list[Action]:
     ]
 
 
+# ── Non-mana activated abilities (e.g. bauble tap/sac) ───────────────────────
+
+def _gen_activate_actions(state: GameState) -> list[Action]:
+    actions: list[Action] = []
+    for perm in state.battlefield:
+        beh = CARD_BEHAVIORS.get(perm.card_name)
+        if beh:
+            actions += beh.generate_activate_actions(state, perm)
+    return actions
+
+
 # ── Special hand actions ──────────────────────────────────────────────────────
 
 def _gen_special_hand_actions(state: GameState) -> list[Action]:
@@ -604,6 +632,28 @@ def _gen_special_hand_actions(state: GameState) -> list[Action]:
 
 def _get_any_stack_targets(state: GameState) -> list[tuple[str, str]]:
     return [(obj.stack_id, obj.card_name) for obj in state.stack if not obj.is_draw_trigger]
+
+
+def _get_typed_stack_targets(state: GameState, target_filter: str) -> list[tuple[str, str]]:
+    if target_filter == "any":
+        return _get_any_stack_targets(state)
+    from .cards import get_card
+    results = []
+    for obj in state.stack:
+        if obj.is_draw_trigger:
+            continue
+        cd = get_card(obj.card_name)
+        if cd is None:
+            continue
+        if target_filter == "instant_sorcery" and (cd.is_instant or cd.is_sorcery):
+            results.append((obj.stack_id, obj.card_name))
+        elif target_filter == "instant_sorcery_enchantment" and (cd.is_instant or cd.is_sorcery or cd.is_enchantment):
+            results.append((obj.stack_id, obj.card_name))
+        elif target_filter == "noncreature" and not cd.is_creature:
+            results.append((obj.stack_id, obj.card_name))
+        elif target_filter == "blue_spell" and cd.has_blue:
+            results.append((obj.stack_id, obj.card_name))
+    return results
 
 
 def _get_single_target_stack_objects(state: GameState) -> list[tuple[str, str]]:
@@ -629,11 +679,41 @@ def _get_creature_targets(state: GameState) -> list[tuple[str, str]]:
     return targets
 
 
+def _get_nonland_permanent_targets(state: GameState) -> list[tuple[str, str]]:
+    """Own nonland permanents plus dummy opponent nonland permanent."""
+    from .cards import get_card
+    results = []
+    for perm in state.battlefield:
+        cd = get_card(perm.card_name)
+        if cd and not cd.is_land:
+            results.append((perm.perm_id, perm.card_name))
+    opp = state._opponent_creature_perm
+    if opp:
+        results.append((opp.perm_id, "[opponent dummy permanent]"))
+    return results
+
+
 def _get_artifact_targets(state: GameState) -> list[tuple[str, str]]:
     """Dummy opponent artifact target (used for spells like Mogg Salvage)."""
     opp = state._opponent_artifact_perm
     if opp:
         return [(opp.perm_id, "[opponent dummy artifact]")]
+    return []
+
+
+def _get_opponent_permanent_target(state: GameState) -> list[tuple[str, str]]:
+    """Dummy opponent creature target (used for spells like Sink into Stupor)."""
+    opp = state._opponent_creature_perm
+    if opp:
+        return [(opp.perm_id, "[opponent dummy permanent]")]
+    return []
+
+
+def _get_opponent_land_target(state: GameState) -> list[tuple[str, str]]:
+    """Dummy opponent land target (used for spells like Sundering Eruption)."""
+    opp = state._opponent_land_perm
+    if opp:
+        return [(opp.perm_id, "[opponent dummy land]")]
     return []
 
 
@@ -643,6 +723,15 @@ def _get_mv1_stack_targets(state: GameState) -> list[tuple[str, str]]:
         (obj.stack_id, obj.card_name)
         for obj in state.stack
         if not obj.is_draw_trigger and (cd := get_card(obj.card_name)) and cd.mv == 1
+    ]
+
+
+def _get_blue_permanents(state: GameState) -> list[tuple[str, str]]:
+    from .cards import get_card
+    return [
+        (perm.perm_id, perm.card_name)
+        for perm in state.battlefield
+        if (cd := get_card(perm.card_name)) and cd.has_blue
     ]
 
 
@@ -685,29 +774,29 @@ def _blue_cards_with_mv_in_hand(state: GameState, exclude: str, mv: int) -> list
     ]
 
 
+_ISLAND_LANDS = frozenset({
+    "Island", "Volcanic Island", "Steam Vents", "Fiery Islet", "Thundering Falls",
+})
+
+
+def _is_island(perm) -> bool:
+    """True if the permanent is an Island (by name or chosen land type)."""
+    return perm.card_name in _ISLAND_LANDS or perm.counters.get("land_type") == "Island"
+
+
 def _islands_on_battlefield(state: GameState) -> list:
-    from .cards import get_card
-    return [
-        p for p in state.battlefield
-        if (cd := get_card(p.card_name)) and cd.is_land
-        and ("U" in (cd.mana_colors or "") or cd.name in ("Island", "Volcanic Island", "Steam Vents", "Fiery Islet"))
-        and not p.tapped
-    ]
+    return [p for p in state.battlefield if _is_island(p) and not p.tapped]
 
 
-# Known Mountain-subtype lands (dual lands that are also Mountains).
 _MOUNTAIN_LANDS = frozenset({
-    "Mountain",
-    "Volcanic Island",
-    "Steam Vents",
-    "Stomping Ground",
-    "Sacred Foundry",
-    "Blood Crypt",
-    "Badlands",
-    "Taiga",
+    "Mountain", "Volcanic Island", "Steam Vents", "Thundering Falls",
+    "Stomping Ground", "Sacred Foundry", "Blood Crypt", "Badlands", "Taiga",
 })
 
 
 def _we_control_mountain(state: GameState) -> bool:
     """True if we have a Mountain (or Mountain-subtype dual) on the battlefield."""
-    return any(p.card_name in _MOUNTAIN_LANDS for p in state.battlefield)
+    return any(
+        p.card_name in _MOUNTAIN_LANDS or p.counters.get("land_type") == "Mountain"
+        for p in state.battlefield
+    )

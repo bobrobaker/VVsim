@@ -70,5 +70,6 @@ Card library / active deck:
 - Cards missing from CSV → error; cards missing from `card_behaviors.py` → warning only (generic rules apply)
 
 Next task:
-- refactor wincon/extra turn cards to use language "terminator" since we'll be adding more items to that conceptual cluster that aren't strictly extra turn spells but we can reasonably assume end the simulation with a win
-- Prep for specific card behavior refining
+- Prep for specific card behavior refining: instructions are located in docs/claude_bucket_instructions, which will refrence docs/card_specifcs.md and provide touchpoints into other files. 
+    - Completed buckets: nonland_mana_sources
+    - Next bucket: (pick next from docs/claude_bucket_instructions.md)
