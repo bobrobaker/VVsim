@@ -136,19 +136,20 @@ def pay_cost(pool: ManaPool, cost: ManaCost) -> ManaPool:
     hybrid -= h_from_r
     p.ANY -= hybrid
 
-    # Pay generic: C first, then ANY, then U, then R
+    # Pay generic: C first, then surplus colored (U, R), then ANY last
+    # ANY is most flexible (can pay future colored pips), so preserve it
     generic = cost.generic + cost.x_value
     take = min(generic, p.C)
     p.C -= take
-    generic -= take
-    take = min(generic, p.ANY)
-    p.ANY -= take
     generic -= take
     take = min(generic, p.U)
     p.U -= take
     generic -= take
     take = min(generic, p.R)
     p.R -= take
+    generic -= take
+    take = min(generic, p.ANY)
+    p.ANY -= take
     generic -= take
 
     assert generic == 0

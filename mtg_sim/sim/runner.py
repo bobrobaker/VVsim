@@ -196,6 +196,8 @@ def _manual_choose_action(state: GameState, actions: list, step: int) -> Optiona
         print(f"Stack: {[str(o) for o in state.stack]}")
     if state.graveyard:
         print(f"Graveyard: {state.graveyard}")
+    if state.exile:
+        print(f"Exile: {state.exile}")
     print(f"\nAvailable actions:")
     for i, action in enumerate(actions):
         print(f"  [{i:2d}] {action.description}")

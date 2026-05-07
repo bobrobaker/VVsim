@@ -148,3 +148,28 @@ def test_invert_not_castable_with_c_only():
     pool = ManaPool(C=1)
     cost = ManaCost(pip_ur_hybrid=1)
     assert not can_pay_cost(pool, cost)
+
+
+# ── Generic payment order: preserve ANY ──────────────────────────────────────
+
+def test_generic_spends_surplus_colored_before_any():
+    # Pool U=2, ANY=1; cost {U}{1}: surplus U should pay generic, ANY preserved
+    pool = ManaPool(U=2, ANY=1)
+    cost = ManaCost(pip_u=1, generic=1)
+    result = pay_cost(pool, cost)
+    assert result.U == 0
+    assert result.ANY == 1  # ANY preserved for future pip needs
+
+def test_generic_spends_r_before_any():
+    pool = ManaPool(R=2, ANY=1)
+    cost = ManaCost(pip_r=1, generic=1)
+    result = pay_cost(pool, cost)
+    assert result.R == 0
+    assert result.ANY == 1
+
+def test_generic_falls_through_to_any_when_no_colored():
+    # Only ANY available for generic
+    pool = ManaPool(ANY=3)
+    cost = ManaCost(pip_u=1, generic=2)
+    result = pay_cost(pool, cost)
+    assert result.total() == 0

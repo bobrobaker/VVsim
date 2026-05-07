@@ -2,14 +2,12 @@
 
 Project: single-turn cEDH spell-chain simulator for Vivi Ornitier + Curiosity.
 
-Goal: simulate whether a starting state can chain enough spells to win.
-Win conditions:
-- cast an extra-turn win card, e.g. Final Fortune / Last Chance
-- cast 40+ noncreature spells in one turn
+Goal: simulate whether a starting state can chain enough spells to "Win" 
 
 ## Commands
 
 All tests: `python3 -m pytest mtg_sim/tests/ -q`
+All tests, suppress known warnings: `python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning`
 One test: `python3 -m pytest mtg_sim/tests/<test_file>.py -v`
 Single trace: `python3 -m mtg_sim.scripts.run_single --mana-u 1 --mana-r 1 --seed 42`
 Monte Carlo: `python3 -m mtg_sim.scripts.run_monte_carlo --runs 1000 --mana-u 1`
@@ -29,7 +27,7 @@ Key files:
 - `sim/state.py`: GameState, zones, permanents, permissions, logs
 - `sim/actions.py`: Action / CostBundle / EffectBundle
 - `sim/stack.py`: StackObject and stack representation
-- `sim/action_generator.py`: assembles legal actions
+- `sim/action_generator.py`: generic legal-action scaffolding
 - `sim/card_behaviors.py`: card-specific action generation and resolution
 - `sim/resolver.py`: applies chosen action to GameState
 - `sim/policies.py`: greedy action scoring
@@ -38,38 +36,57 @@ Key files:
 ## Design rules
 
 - Manual mode and policy mode should use the same legal action list when practical.
-- Resolution should execute choices encoded in Actions or explicit pending choices.
+- `action_generator.py` owns generic scaffolding: iterate zones, enforce timing/stack rules, call behavior hooks.
+- Card behavior owns card-specific action generation and resolution.
 - Use readable names in traces/manual mode, not object IDs.
-- Use focused tests for each simulator rule/card bug.
-- For architectural questions, inspect first and recommend the smallest safe change before refactoring.
 
 ## Context hygiene
 
-- Grep for exact line numbers first, then read only those ranges, then write. Never read a whole file to find a section.
-- Before reading a file over ~150 lines, explain why the full file is needed.
+- Use grep for symbol, field, registry, constant, and call-site checks before reading code.
+- Read only relevant ranges, but prefer one complete function/class range over multiple partial reads.
+- Do not read a whole file to find a section.
+- Before reading >150 lines, explain why the full range is needed.
+- Separate required reads from conditional reads. Read conditional files only when the change touches that concern.
 - Do not inspect unrelated files.
-- After each focused task, run the smallest relevant test first, then broader tests if needed.
-- When starting a chunk, provide line anchors for the touch points (e.g. "imprint block is lines 61–84") to skip the exploration phase entirely.
+- Do not re-read information already answered by grep or prior output in the same session.
+- When starting a chunk, provide line anchors for touchpoints when possible to skip exploration.
+- After each focused task, run the smallest relevant test first, then broader tests only if needed.
+- For broad pytest runs, suppress known noisy warnings unless investigating warnings.
+- CompanionDocs: before editing any `mtg_sim/` file, `.claude/rules/sim-notes.md` auto-loads a matching `docs/notes/` file with Touchpoints and Gotchas.
+- Testing rules are in `.claude/rules/tests.md` (auto-loaded for `mtg_sim/tests/**`).
 
-## Current Status
+## Card-specific implementation direction
 
-Architecture direction (agreed):
-- `action_generator.py` owns generic scaffolding: iterate zones, enforce timing/stack rules, call behavior hooks.
-- Each card behavior owns both action generation (when/what) and resolution (what happens).
-- Long-term: split into per-card files so each card's full behavior (generation + resolution + tests) can be handed off cleanly. Deferred until individual behaviors grow large enough to warrant it (~half of card behaviors are not well-implemented and will need test coverage first).
-- `None`-sentinel pattern is the hook: any behavior can take ownership of its card's action generation by returning a list from `generate_actions()`.
+See `docs/workstream_card_specific.md` for the full bucket workflow.
 
-Long term todo:
-- card refining: Use docs to describe the intended behavior of each card specific card behavior refining: check unimplemented card tokens
-- policy refining: refactor policy to have weights that are in text editable policy config file, in manual mode when reporting actions for the user to choose also display what the policies system thinks of each choice, if then you choose not the top policy manual mode will prompt you as to why and it will log that in a policy-adjustment log + any relevant info about the state. Then review the policy log with claude to refine policy behavior
+- Prefer card-specific logic in `card_behaviors.py`.
+- Keep `action_generator.py` as generic scaffolding where practical.
+- If a card needs special action generation, prefer `CardBehavior.generate_actions(...)`.
+- If a card needs special resolution, prefer `CardBehavior.resolve_cast(...)`.
+- If a card needs battlefield or mana behavior, use `generate_mana_actions(...)`, `generate_activate_actions(...)`, or `on_enter(...)`.
+- Noncreature spell casts should still trigger Vivi/Curiosity through existing cast logic.
+- Permanent spells should enter battlefield through existing resolver logic unless the card says otherwise.
+- Nonpermanent spells should go to graveyard unless the card says otherwise.
+- Do not model omitted real-card behavior unless `docs/card_specifics.md` says to model it.
+- Add `Comments:` text from `docs/card_specifics.md` as implementation comments when it explains a simulator simplification.
 
-Card library / active deck:
-- `card_library.csv` — all cards the sim knows about (ID 1 = Vivi, always present)
-- Active deck = list of card IDs; default is IDs 2–100; configured via `--deck-ids` CLI flag or by passing a list to `build_active_deck()`
-- `cards.py`: `load_card_library()` loads CSV, `build_active_deck(card_ids)` validates IDs and warns on missing behaviors
-- Cards missing from CSV → error; cards missing from `card_behaviors.py` → warning only (generic rules apply)
+## For policy work
 
-Next task:
-- Prep for specific card behavior refining: instructions are located in docs/claude_bucket_instructions, which will refrence docs/card_specifcs.md and provide touchpoints into other files. 
-    - Completed buckets: nonland_mana_sources
-    - Next bucket: (pick next from docs/claude_bucket_instructions.md)
+- Inspect `sim/policies.py` and the relevant action/state fields first.
+- Keep policy scoring separate from legality.
+- Do not fix legality bugs in policy code.
+- Prefer small scoring changes with focused tests.
+
+## Backlog
+
+When you notice an opportunity to refactor, improve architecture, reduce technical debt, or use a better long-term approach — but it is not needed for the current task — create a task via TaskCreate with status `pending`, subject prefixed `[SUGGESTION]`, and a structured description following `docs/backlog_instructions.md`.
+
+Do not create backlog items for low-value style nits. Only medium- or high-value improvements.
+
+Human todos: `docs/todo.md`. Task backlog: via TaskCreate (stored in `~/.claude/tasks/`).
+
+## Planned extensions
+
+These constrain current architectural decisions:
+- Policy weights will move to a text-editable config file; keep scoring logic separate from action generation.
+- Card behaviors may eventually split into per-card files; keep each behavior self-contained.

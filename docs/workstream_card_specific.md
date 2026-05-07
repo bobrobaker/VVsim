@@ -1,8 +1,10 @@
-# Claude Implementation Instructions: Card-Specific Buckets
+# Workstream: Card-Specific Bucket Implementation
+
+**Bucket**: A scoped cluster of similar cards sharing logic patterns and likely touchpoints, intended for one focused Claude session.
+
+**Workstream**: A broader multi-session effort composed of buckets, organized to preserve architectural continuity while limiting per-session context.
 
 Goal: implement card-specific simulator behavior from `docs/card_specifics.md` one bucket at a time, with focused tests.
-
-Before editing, verify the `docs/card_specifics.md` checksum: card headings should match the expected non-commander deck-card count, excluding the `Intake New Cards` placeholder. If the count does not match, stop and report the mismatch.
 
 ## Context rules
 
