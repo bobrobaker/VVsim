@@ -1,0 +1,132 @@
+{
+  "entry_type": "manual_decision_snapshot",
+  "timestamp": "2026-05-08T10:15:00Z",
+  "seed": 12345,
+  "step": 8,
+  "policy_trainable": true,
+  "invalid_reason": null,
+  "state": {
+    "floating_mana": {
+      "U": 1,
+      "R": 0,
+      "C": 2,
+      "ANY": 0
+    },
+    "hand": [
+      "Gitaxian Probe",
+      "Final Fortune",
+      "Mox Opal"
+    ],
+    "hand_ids": [
+      28,
+      22,
+      57
+    ],
+    "library_ids": [
+      43,
+      12,
+      88,
+      31,
+      76,
+      54
+    ],
+    "battlefield": [
+      {
+        "card_name": "Volcanic Island",
+        "card_id": 99,
+        "perm_id": "abc12345",
+        "tapped": true,
+        "counters": {},
+        "imprinted_card": null,
+        "attached_to": null
+      },
+      {
+        "card_name": "Mox Opal",
+        "card_id": 57,
+        "perm_id": "def67890",
+        "tapped": false,
+        "counters": {},
+        "imprinted_card": null,
+        "attached_to": null
+      }
+    ],
+    "stack": [
+      {
+        "card_name": "_DrawTrigger",
+        "card_id": null,
+        "stack_id": "st001",
+        "targets": [],
+        "target_names": [],
+        "x_value": 0,
+        "alt_cost_used": null,
+        "is_draw_trigger": true,
+        "draw_count": 3
+      }
+    ],
+    "graveyard": [
+      "Rite of Flame"
+    ],
+    "graveyard_ids": [
+      72
+    ],
+    "exile": [],
+    "exile_ids": [],
+    "pending_choices": [],
+    "permissions": [],
+    "pending_curiosity_draws": 3,
+    "noncreature_spells_cast": 4,
+    "total_cards_drawn": 12,
+    "land_play_available": false,
+    "vivi_available_as_creature_to_tap": true,
+    "legendary_permanent_available": true,
+    "virtue_of_courage_on_battlefield": false
+  },
+  "ranked_actions": [
+    {
+      "index": 0,
+      "rank": 1,
+      "score": 180.0,
+      "delta": 0.0,
+      "action_type": "CAST_SPELL",
+      "source_card": "Gitaxian Probe",
+      "source_card_id": 28,
+      "description": "Cast Gitaxian Probe (pay life)",
+      "target": null,
+      "alt_cost_type": "pay_life",
+      "risk_level": "safe"
+    },
+    {
+      "index": 1,
+      "rank": 2,
+      "score": 90.0,
+      "delta": -90.0,
+      "action_type": "ACTIVATE_MANA_ABILITY",
+      "source_card": "Mox Opal",
+      "source_card_id": 57,
+      "description": "Tap Mox Opal (metalcraft) for {R}",
+      "target": null,
+      "alt_cost_type": null,
+      "risk_level": "safe"
+    }
+  ],
+  "policy_top_action": {
+    "index": 0,
+    "description": "Cast Gitaxian Probe (pay life)",
+    "score": 180.0
+  },
+  "chosen_action": {
+    "index": 1,
+    "rank": 2,
+    "score": 90.0,
+    "delta": -90.0,
+    "description": "Tap Mox Opal (metalcraft) for {R}"
+  },
+  "chosen_was_policy_top": false,
+  "manual_notes": [
+    {
+      "kind": "note",
+      "text": "Need red mana before spending more cards.",
+      "policy_trainable": true
+    }
+  ]
+}

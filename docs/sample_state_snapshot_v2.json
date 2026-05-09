@@ -1,0 +1,76 @@
+{
+  "floating_mana": {
+    "U": 1,
+    "R": 0,
+    "C": 2,
+    "ANY": 0
+  },
+  "hand": [
+    "Gitaxian Probe",
+    "Final Fortune",
+    "Mox Opal"
+  ],
+  "hand_ids": [
+    28,
+    22,
+    57
+  ],
+  "library_ids": [
+    43,
+    12,
+    88,
+    31,
+    76,
+    54
+  ],
+  "battlefield": [
+    {
+      "card_name": "Volcanic Island",
+      "card_id": 99,
+      "perm_id": "abc12345",
+      "tapped": true,
+      "counters": {},
+      "imprinted_card": null,
+      "attached_to": null
+    },
+    {
+      "card_name": "Mox Opal",
+      "card_id": 57,
+      "perm_id": "def67890",
+      "tapped": false,
+      "counters": {},
+      "imprinted_card": null,
+      "attached_to": null
+    }
+  ],
+  "stack": [
+    {
+      "card_name": "_DrawTrigger",
+      "card_id": null,
+      "stack_id": "st001",
+      "targets": [],
+      "target_names": [],
+      "x_value": 0,
+      "alt_cost_used": null,
+      "is_draw_trigger": true,
+      "draw_count": 3
+    }
+  ],
+  "graveyard": [
+    "Rite of Flame"
+  ],
+  "graveyard_ids": [
+    72
+  ],
+  "exile": [],
+  "exile_ids": [],
+  "pending_choices": [],
+  "permissions": [],
+  "pending_curiosity_draws": 3,
+  "noncreature_spells_cast": 4,
+  "total_cards_drawn": 12,
+  "land_play_available": false,
+  "vivi_available_as_creature_to_tap": true,
+  "legendary_permanent_available": true,
+  "virtue_of_courage_on_battlefield": false
+}

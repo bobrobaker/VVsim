@@ -1,0 +1,29 @@
+Task: Implement/refine only docs/card_specifics.md Generic No-Op Permanents bucket. Use anchors first; avoid broad exploration.
+"Read touchpoints on demand as you implement each card, not upfront as a checklist."
+
+Bucket/spec:
+- card_specifics.md:623-640 — Generic No-Op Permanents: Mystic Remora, Rhystic Study.
+- claude_bucket_instructions.md:19-49 — workflow/rules/tests.
+- card_library.csv: Mystic Remora/Rhystic Study metadata rows only.
+
+Core touchpoints:
+- action_generator.py:192-276 — generic cast action generation and timing.
+- resolver.py:87-164 — noncreature cast creates normal Curiosity draw trigger.
+- resolver.py:171-214 — spell resolution calls behavior then moves artifacts/enchantments/creatures to battlefield.
+- resolver.py:218-231 — _enter_battlefield creates Permanent and calls on_enter.
+- card_behaviors.py:28-43 — base CardBehavior no-op methods.
+- card_behaviors.py:772-774 — NullBehavior.
+- card_behaviors.py:1395-1435 — registry; check whether Mystic Remora/Rhystic Study are absent and whether they can safely use default/NullBehavior.
+- state.py:14-20,66-92 — Permanent and GameState battlefield/Curiosity fields.
+
+Existing test anchors:
+- test_cast_noncreature.py:17-75 — noncreature cast creates draw trigger and stack object.
+- test_led_preempt.py:81-118 — no-op artifact/enchantment-like spell stack resolution pattern.
+- test_timing_rules.py:18-77 — helper + timing pattern if needed.
+
+Suspected gaps to verify/fix:
+- Mystic Remora and Rhystic Study likely need only default cast/resolution to battlefield, no triggered draw behavior other than default from curiosity affect
+- If registry entries are needed for comments/explicit no-op, use NullBehavior or tiny behavior with comments from card_specifics.
+- Do not model opponent-cast triggers.
+
+Tests: default cast generated when payable; noncreature cast creates normal Vivi/Curiosity draw trigger; resolution enters battlefield; no extra Remora/Rhystic draw beyond normal cast trigger.

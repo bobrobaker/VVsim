@@ -1,0 +1,40 @@
+Task: Implement/refine only docs/card_specifics.md Misc Spells bucket. Use anchors first; avoid broad exploration.
+"Read touchpoints on demand as you implement each card, not upfront as a checklist."
+
+Bucket/spec:
+- card_specifics.md:510-622 — Misc Spells.
+- claude_bucket_instructions.md:19-49 — workflow/rules/tests.
+- card_library.csv: misc card metadata rows only.
+
+Core touchpoints:
+- actions.py:6-23,52-92 — existing Action/CostBundle fields; prefer target/alt_cost_type over new action types unless necessary.
+- state.py:14-20,105-141 — Permanent fields + dummy opponent targets.
+- action_generator.py:192-276 — CardBehavior delegation + generic cast construction.
+- action_generator.py:308-317 — Repeal target helper.
+- action_generator.py:320-400 — generic pay-life/pitch/flashback/split alt costs.
+- action_generator.py:641-661,747-753 — creature/artifact dummy target helpers + Mountain check.
+- resolver.py:87-164,171-214 — cast stack object + resolve behavior/final zones.
+- resolver.py:271-359 — activate/sacrifice resolver patterns for bauble-style abilities.
+- card_behaviors.py:600-666 — Twisted Image + Repeal.
+- card_behaviors.py:671-697 — Mogg Salvage.
+- card_behaviors.py:711-731 — current Bauble/Vexing no-op stubs.
+- card_behaviors.py:772-774 — NullBehavior.
+- card_behaviors.py:1027-1062 — Blazing Shoal.
+- card_behaviors.py:1419-1443 — current registry around misc cards.
+- policies.py:31-113 — scoring for cheap/free/draw spells.
+
+Existing test anchors:
+- test_blazing_shoal.py:1-84 — existing Blazing Shoal tests; likely update for creature target requirement.
+- test_cast_noncreature.py:17-75 — cast/draw-trigger helper pattern.
+- test_led_preempt.py:81-158 — stack/draw-trigger timing examples.
+- test_timing_rules.py:18-77 — helper + instant/sorcery timing patterns.
+- test_counterspells.py:24-36 — StackObject helper pattern for stack-target tests.
+
+Suspected gaps to verify/fix:
+- Missing or incomplete: Boomerang Basics, Cave-In, Chain of Vapor, Crowd's Favor, Gut Shot, Pyrokinesis, Redirect Lightning, Secret Identity, Thunderclap, Wild Ride.
+- Snapback currently registered as CounterspellBehavior; spec says creature bounce, not counterspell.
+- Blazing Shoal currently lacks creature target requirement.
+- Baubles/Vexing currently no-op only; spec requires activated abilities, and Vexing free-spell trigger.
+- Mogg Salvage/Re­peal/Twisted Image are partial; verify targets/resolution against spec.
+
+Tests: add/update focused tests for target legality, own-vs-dummy permanent handling, pitch/free costs exile resources, copies/noncast effects do not trigger Curiosity, bauble activations, Vexing trigger/draw ability, and Wild Ride harmonize.
