@@ -11,7 +11,7 @@ Report:
 
 ## Step 2: Identify recurring mistakes
 
-Check `docs/introspect_notes.md` for patterns that appeared in prior sessions and recurred in this one. Flag any repeated mistakes explicitly.
+Check last 50 lines of `docs/introspect_notes.md` for patterns that appeared in prior sessions and recurred in this one. Flag any repeated mistakes explicitly.
 
 ## Step 3: Route actionable takeaways
 
@@ -19,11 +19,12 @@ For each concrete takeaway, recommend the best destination:
 
 | Destination | When to use |
 |---|---|
-| `docs/workstream_card_specific.md` | Takeaway improves future card-bucket sessions |
 | `CLAUDE.md` | Stable, global, applies every session |
 | `.claude/rules/` | Can be triggered syntactically by file path/glob |
 | Claude memory | Durable user preference or general workflow preference |
-| `docs/introspect_notes.md` | Qualitative finding worth preserving but not actionable yet |
+| ContextNotes (`docs/notes/<file>.md`) | File-specific gotcha, touchpoint, or invariant discovered while editing that file. Create one if this is chosen if it didn't already exist |
+| `docs/Prebaker.md` | Session was prebaked and takeaway improves future prompt generation |
+| Workstream prompt (`docs/workstream_<name>_.md`) | Session began from a workstream prompt and takeaway improves future sessions in that workstream |
 
 ## Step 4: Confirm
 
@@ -40,4 +41,6 @@ After confirmation, make the accepted changes.
 
 ## Step 7: Backlog report
 
-Report: how many `[SUGGESTION]` backlog tasks were added this session? If zero, name the one thing that would have been logged. Give a one-line summary of the highest-value item added, if any.
+First, identify anything that should have been logged during the session but wasn't — every item meeting the CLAUDE.md criteria (medium/high value OR medium/high urgency). Call `TaskCreate` for each automatically (no confirmation needed).
+
+Then report: how many `[SUGGESTION]` backlog tasks were added this session in total (including any just created above)? List at least the top 3 in order of criticality, with a one-line value/urgency note for each. If fewer than 3 real candidates exist, name the next closest things that would have been logged and why they didn't meet the bar.

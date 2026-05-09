@@ -49,7 +49,8 @@ Final Claude prompt requirements:
   - Preserve subtle architectural constraints
 - Add a short “Tips” section if after reading introspect_notes reveals recurring mistakes.
 - Add a “Report first” section asking Claude to summarize current behavior, proposed implementation, tests, and any extra touchpoints needed.
-- End with: "Only edit after the plan is clear" + [time and datestamp] + [name of LLM that this prompt was recieved by]
+- Add a "Only edit after the plan is clear" near the bottom
+- At the very end line: "Prebaked with Prebaker" + [time and datestamp] + [name of LLM that this prompt was recieved by]
 
 Output format:
 1. Briefly state any assumptions you made.

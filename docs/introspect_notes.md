@@ -135,3 +135,114 @@ Input heavy — roughly **6:1 input:output**. The behavior code reads were large
 
 - **Before writing any `Action(...)` in a test, grep an existing test for `Action(` to get exact kwarg names.** `grep -n "Action(" mtg_sim/tests/test_nonland_mana_sources.py` returns `source_card=`, `costs=`, `effects=` in one shot. This is now logged as a [SUGGESTION] task to add to `tests.md`.
 - **Introspect skill: log/notes writes are unconditional; only ask confirmation for routing changes.** Split SUGGESTION report into Step 7 so it can't be skipped as housekeeping. (Implemented this session.)
+
+---
+
+## Policy Priorities Refactor
+
+**Session:** 2026-05-07, policy scoring refactor — pitch penalty, free mana source bonus, win-cast mana priority, red mana preference, red-spend penalty. 390 tests pass; 10 new tests added.
+
+### Estimated token ratio
+
+~4:1 input:output. Lighter than recent sessions — no exploratory reads, mostly targeted greps and one full file read.
+
+### What was useful
+
+- `policies.py` full read — earned; full rewrite of scoring logic.
+- `docs/notes/sim/policies.py.md` — earned; touchpoints confirmed before editing.
+- Targeted greps (alt_cost_type values, CostBundle fields, ManaPool fields, card data fields) — all high yield, single-call each.
+- `test_policy_config.py` full read — earned; needed insertion point and helper patterns.
+
+### Main token drains
+
+1. **`test_manual_policy_feedback.py` head read (80 lines)** — only needed `_cast()` helper pattern (~15 lines). A single `grep -n "def _cast"` would have been sufficient.
+2. **Wrong mana cost for Final Fortune in tests** — assumed pip_r=1 (costs {R}) but it costs {R}{R} (pip_r=2). Two tests failed; required inspect + fix cycle. A `get_card('Final Fortune').pip_r` one-liner before writing the assertion would have prevented this entirely.
+3. **policy.toml discovered late** — noticed only when sanity check showed `mana_ritual_bonus=40` (old value). Should check for TOML file existence at the start of any policy session and treat it as the canonical source.
+
+### Concrete recommendations
+
+- **Extend "verify ManaPool arithmetic" rule to cover card pip counts.** `get_card('<name>').pip_r` before writing cost-sensitive tests prevents wrong-amount cycles. (Added to `tests.md`.)
+- **At start of any policy session, check if `policy.toml` exists and treat it as authoritative.** Update it alongside `_DEFAULTS` whenever new keys are added. (Added to `policies.py.md` Gotchas.)
+- **When only the helper pattern is needed from a test file, grep `def _cast` instead of reading the file.** Saves ~65 lines of context.
+
+---
+
+## Policy Config + Scoring Visibility
+
+**Session:** 2026-05-07, policy scoring refactor. Moved weights to `mtg_sim/config/policy.toml`, added `ScoredAction`/`rank_actions`/`score_action_with_reasons`, rewired manual mode to display scores/delta/reasons and log JSONL overrides. 380 tests pass; 19 new tests added (1 minor fix during test run).
+
+### Estimated token ratio
+
+~8:1 input:output. Heavy reading phase from session prompt's pre-listed touchpoints, then large parallel writes.
+
+### What was useful
+
+- Session prompt's explicit required/conditional/do-not-read structure — eliminated all exploratory reads. Every file touched was pre-identified with line anchors.
+- `policies.py` full read (368 lines) — necessary; full rewrite required full read.
+- `test_runner_manual_display.py` full read — confirmed backward compatibility before editing `_manual_choose_action`.
+- `mana.py:1–50` and `state.py:51–130` — both needed for JSONL snapshot field names.
+
+### Main token drains
+
+1. **runner.py read in 3 separate chunks with overlap** (1–65, 63–120, 117–242). A single read of 1–250 would have covered all three. Recurring pattern from prior sessions.
+2. **Test grep returned 30+ lines across many files before reading `test_runner_manual_display.py` directly.** The grep confirmed which file to read, but a direct read would have been faster. If the target file is already known from the session prompt, skip the grep.
+3. **`state.py:51–130` included opponent-dummy fields (100–130) not needed for snapshot serialization.** Limit of ~90 would have been sufficient.
+
+### Concrete recommendations
+
+- **When the session prompt already names the target file, read it directly; skip the broad grep.** The grep for test patterns returned `test_runner_manual_display.py` as the only relevant file — which was already in the session prompt's touchpoints. Direct read would have saved ~20 lines of grep noise.
+- **For runner.py sessions touching both RunConfig and simulate_run: read lines 1–250 in one shot.** (Added to runner.py.md CompanionDoc.)
+- **Module-level caches need `_clear_cache()` + conftest.py autouse.** Discovered here for `_config_cache`; added to `tests.md`.
+- **Recurring drain: sequential narrow reads of runner.py.** Third session to exhibit this. If it appears again, escalate to CLAUDE.md.
+
+---
+
+## Manual Observation Logging
+
+**Session:** 2026-05-08. Added obs buffer, n/m/i/r commands, session-end save, v2 state snapshot, `RunConfig.manual_observation_log_path`, CLI arg. 400/400 pass; 10 new tests.
+
+### Estimated token ratio
+
+~4:1 input:output. Reads were targeted; output was dense (runner.py rewrite + new tests).
+
+### What was useful
+
+- Session prompt with explicit required/avoid touchpoints — eliminated all exploratory reads.
+- Sample JSON files (`sample_manual_decision_snapshot.json`, `sample_state_snapshot_v2.json`) — confirmed exact schema shape before writing `_state_snapshot`.
+- `runner.py` full read — appropriate; entire file was the implementation surface.
+- Targeted greps for `ScoredAction`, `Permanent`, `StackObject` fields — single calls, high yield.
+
+### Main token drains
+
+1. **Full test file read (234 lines)** — needed `Action(` kwargs, `log_path=` call sites, and helper patterns. All three could have been targeted greps (~15 lines total). Full-file-read-for-test pattern recurred from "Policy Priorities Refactor" session.
+2. **Post-rename grep to find remaining `log_path=` call sites** — should have grepped before renaming to know the blast radius. Two multi-pass fix rounds resulted.
+3. **Two-pass grep to confirm `get_card_by_id`** — one well-formed grep would have sufficed.
+
+### Concrete recommendations
+
+- **Full-test-file-read pattern escalated to `tests.md`** (two new rules added this session): grep for specific patterns before reading; grep for parameter names before renaming.
+- **No new destinations needed** — both takeaways routed to `tests.md` where they're auto-loaded for test-file work.
+
+---
+
+## Default Obs Log Path
+
+**Session:** 2026-05-08. Added default path for `--manual-observation-log` in `run_single.py`; runner already appends. Closed backlog task #3.
+
+### Estimated token ratio
+
+~15:1 input:output. Micro-session; two edits.
+
+### What was useful
+
+- Single targeted grep on runner.py confirmed append behavior without reading the file.
+- No exploration reads needed.
+
+### Main token drains
+
+1. **Ambient context load** — unavoidable; dwarfs actual work.
+2. Nothing else notable at this scale.
+
+### Concrete recommendations
+
+None. Session too small to surface new patterns.

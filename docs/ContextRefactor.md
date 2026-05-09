@@ -74,7 +74,6 @@ Move the Testing rules (from claude.md) to go into a glob-scoped rule file for a
 - Git-tracking the task folder: ~/.claude/tasks/ is outside your repo, so suggestions won't travel with the project. If portability matters, consider symlinking ~/.claude/tasks/myproject-backlog into your repo's .claude/ folder and gitignoring sensitive fields.
 - Refactor docs/claude_bucket_instructions into "workstream_card_specific." Bucket: A scoped cluster of similar tasks sharing logic patterns and likely touchpoints, intended for one focused Claude session. Workstream: A broader multi-session effort composed of buckets, organized to preserve architectural continuity while limiting per-session context.
 - add a hook to the TaskCreated to Print a formatted terminal notification: "→ [BACKLOG] logged: <subject>" and play a subtle sound.
-- For persistent task backlog (survives /clear): add `export CLAUDE_CODE_TASK_LIST_ID=vvsim-backlog` to ~/.bashrc and `source ~/.bashrc`. Without this, TaskCreate uses a session UUID directory and tasks are orphaned on /clear.
 - Add a hook so that terminal gives me a Desktop notification when Claude needs input, so you can switch to other tasks without watching the terminal
 - Recommend me how to change .claude/memory to improve educational value of using claude in general. I'd like to: learn claude, AI-assisted development (not necessarily programming), SW dev and learn specifically python. (If it doesn't cost me signifcantly extra tokens to do so)  
 

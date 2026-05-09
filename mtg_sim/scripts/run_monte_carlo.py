@@ -20,7 +20,7 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=0, help="Base seed (each run gets seed+i)")
     parser.add_argument("--mana-u", type=int, default=0)
-    parser.add_argument("--mana-r", type=int, default=1)
+    parser.add_argument("--mana-r", type=int, default=2)
     parser.add_argument("--mana-c", type=int, default=0)
     parser.add_argument("--curiosity-count", type=int, default=1)
     parser.add_argument("--jobs", type=int, default=1, help="Parallel workers")

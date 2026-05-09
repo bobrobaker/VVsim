@@ -81,7 +81,9 @@ See `docs/workstream_card_specific.md` for the full bucket workflow.
 
 When you notice an opportunity to refactor, improve architecture, reduce technical debt, or use a better long-term approach — but it is not needed for the current task — create a task via TaskCreate with status `pending`, subject prefixed `[SUGGESTION]`, and a structured description following `docs/backlog_instructions.md`.
 
-Do not create backlog items for low-value style nits. Only medium- or high-value improvements.
+Do not create backlog items for low-value style nits. Create an item if value is medium or high, OR if urgency is medium or high (either dimension is sufficient).
+
+Call TaskCreate immediately when the opportunity is noticed — do not defer to `docs/todo.md` or plan to log it later. `docs/todo.md` is for human-managed todos only; it is not a substitute for the task backlog. After completing each logical implementation chunk (any edit block that closes a unit of work), briefly check: is there a suggestion worth logging before moving on?
 
 Human todos: `docs/todo.md`. Task backlog: via TaskCreate (stored in `~/.claude/tasks/`).
 
