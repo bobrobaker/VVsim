@@ -1,0 +1,75 @@
+# Policy scoring weights for the Vivi chain simulator.
+# Edit numeric values here to tune greedy action selection.
+# Missing keys fall back to hardcoded defaults in policies.py.
+
+[cast_spell]
+instant_win              = 10000.0  # extra-turn win card
+unknown_card             = 10.0     # card not in library
+creature                 = 30.0     # creature spell base
+not_noncreature          = 5.0      # has card data but neither creature nor noncreature spell
+noncreature_base         = 100.0    # every noncreature spell draws via Curiosity
+free_cost_bonus          = 60.0     # effective mana cost == 0
+cost_1_bonus             = 30.0     # effective mana cost == 1
+cost_2_bonus             = 15.0     # effective mana cost == 2
+cost_3_bonus             = 5.0      # effective mana cost == 3
+mana_ritual_bonus        = 50.0     # net-mana-positive spells (Rite of Flame / Strike It Rich / Jeska's Will)
+free_mana_source_bonus   = 55.0     # free permanent that produces mana (Lotus Petal / LED / Mox variants)
+tutor_bonus              = 25.0     # any tutor in the TUTORS set
+draw_spell_bonus         = 20.0     # Gitaxian Probe / Twisted Image / Repeal
+own_stack_target_bonus   = 15.0     # counterspell targeting own stack object
+free_alt_cost_bonus      = 25.0     # pay_life / commander_free / delayed_upkeep alt cost
+tight_mana_penalty       = -20.0    # applied when effective_cost >= 3 and mana pool <= 2
+red_spend_penalty        = -30.0    # spending last red on non-ritual while win card needs red
+# Pitched-card penalties (card exiled from hand permanently)
+pitch_base_penalty       = -40.0    # baseline penalty per pitched card
+pitch_priority_extra     = -80.0    # additional penalty for pitching high-priority cards
+pitch_win_card_penalty   = -160.0   # pitching a win card is catastrophic
+
+[risk]
+safe      =   0.0
+normal    =   0.0
+expensive = -15.0
+risky     = -35.0
+desperate = -70.0
+
+[resolve]
+no_target_fallback       = 20.0  # stack object not found
+draw_trigger             = 142.0 # Curiosity draw trigger (resolve to draw)
+draw_trigger_led_preempt = 30.0  # delay draw trigger to crack LED first
+mana_producer            = 85.0  # Rite of Flame, Lotus Petal, etc.
+engine_card              = 80.0  # Curiosity, Sol Ring, Mox variants, etc.
+default                  = 40.0
+
+[mana]
+led_crack_with_draws    = 88.0   # crack LED with pending draws and tiny hand
+enables_win_cast        = 125.0  # mana enables casting a win card
+enables_new_cast        = 90.0   # activating this lets us cast something new
+risk_safe               = 70.0   # safe mana action (no scarce resources consumed)
+default                 = 50.0
+exile_enables_win_cast  = 110.0  # exile-for-mana that enables a win card cast
+exile_enables_new_cast  = 75.0   # exile-for-mana that enables a new cast
+exile_default           = 45.0
+red_for_win_bonus       = 22.0   # generating red (or any) mana when a win card needs red
+red_mana_bonus          = 9.0    # general bonus for producing red mana
+reserve_r_bonus         = 13.0   # bonus for reaching 1R from 0R (red is harder to replace)
+reserve_u_bonus         = 6.0    # bonus for reaching 1U from 0U
+
+[land]
+enables_new_cast = 78.0   # playing this land enables a cast we can't make now
+default          = 55.0
+
+[imprint]
+baseline            = 50.0   # base score for imprinting anything
+color_needed_bonus  = 15.0   # bonus when the color Chrome Mox produces is needed
+mv_penalty_per_pip  = 4.0    # penalty per mana value of the imprinted card
+
+[discard]
+baseline             = 60.0  # base score for discarding a land to Mox Diamond
+enters_tapped_bonus  = 15.0  # prefer discarding tapped-entry lands
+basic_land_bonus     = 10.0  # prefer discarding basics (more replaceable)
+excess_color_bonus   = 5.0   # prefer discarding lands in colors we already have plenty of
+
+[tutor]
+top_score      = 100.0   # score for the highest-priority tutor target
+step_penalty   = 3.0     # subtracted per position in the _TUTOR_PRIORITY list
+unlisted_score = 50.0    # score for a card not in _TUTOR_PRIORITY
