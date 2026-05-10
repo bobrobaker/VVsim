@@ -22,6 +22,7 @@ vivi_target_penalty      = -2.0     # slightly avoid bouncing/removing Vivi when
 free_alt_cost_bonus      = 25.0     # pay_life / commander_free / delayed_upkeep alt cost
 tight_mana_penalty       = -20.0    # applied when effective_cost >= 3 and mana pool <= 2
 red_spend_penalty        = -30.0    # spending last red on non-ritual while win card needs red
+pending_draw_deferral_penalty = -45.0 # prefer resolving top Curiosity draw before non-win casts
 # Pitched-card penalties (card exiled from hand permanently)
 pitch_base_penalty       = -40.0    # baseline penalty per pitched card
 pitch_priority_extra     = -80.0    # additional penalty for pitching high-priority cards
@@ -38,6 +39,7 @@ desperate = -70.0
 no_target_fallback       = 20.0  # stack object not found
 draw_trigger             = 142.0 # Curiosity draw trigger (resolve to draw)
 draw_trigger_led_preempt = 30.0  # delay draw trigger to crack LED first
+mana_producer_priority   = 190.0 # resolve top-stack mana producers before most other actions
 mana_producer            = 85.0  # Rite of Flame, Lotus Petal, etc.
 engine_card              = 80.0  # Curiosity, Sol Ring, Mox variants, etc.
 default                  = 40.0

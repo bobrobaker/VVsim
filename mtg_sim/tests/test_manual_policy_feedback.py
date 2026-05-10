@@ -137,12 +137,15 @@ def test_non_top_choice_writes_jsonl(monkeypatch, tmp_path):
     # Display order is rank order; user picks index 1 (rank 2).
     inputs = iter(["1", "need mana first"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    buf = []
     result = _manual_choose_action(
         state,
         [_cast("Gitaxian Probe"), _cast("Rite of Flame")],
         step=3,
         adjustment_log_path=log_path,
+        observation_buffer=buf,
         seed=99,
+        session_id="manual-run-2",
     )
     assert result is not None
     assert log_path.exists()
@@ -151,12 +154,18 @@ def test_non_top_choice_writes_jsonl(monkeypatch, tmp_path):
     entry = json.loads(lines[0])
 
     assert entry["seed"] == 99
+    assert entry["run_id"] == "manual-run-2"
+    assert entry["session_id"] == "manual-run-2"
+    assert buf[0]["run_id"] == entry["run_id"]
+    assert buf[0]["session_id"] == entry["session_id"]
     assert entry["step"] == 3
     assert entry["chosen_rank"] == 2
     assert entry["top_rank"] == 1
     assert entry["score_delta"] < 0
     assert entry["user_reason"] == "need mana first"
     assert len(entry["all_scored"]) == 2
+    assert "costs" in entry["all_scored"][0]
+    assert "effects" in entry["all_scored"][0]
     assert "state_snapshot" in entry
     snap = entry["state_snapshot"]
     assert "floating_mana" in snap
@@ -241,16 +250,21 @@ def test_choice_appends_to_observation_buffer(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     buf = []
     _manual_choose_action(state, [_cast("Gitaxian Probe")], step=5,
-                          observation_buffer=buf, seed=7)
+                          observation_buffer=buf, seed=7, session_id="manual-run-1")
     assert len(buf) == 1
     entry = buf[0]
     assert entry["entry_type"] == "manual_decision_snapshot"
+    assert entry["run_id"] == "manual-run-1"
+    assert entry["session_id"] == "manual-run-1"
     assert entry["step"] == 5
     assert entry["seed"] == 7
     assert entry["policy_trainable"] is True
     assert "state" in entry
     assert "library_ids" in entry["state"]
     assert "ranked_actions" in entry
+    action_entry = entry["ranked_actions"][0]
+    assert action_entry["costs"]["mana"]["pip_u"] == 0
+    assert action_entry["effects"]["add_mana"] == {"U": 0, "R": 0, "C": 0, "ANY": 0}
     assert entry["chosen_was_policy_top"] is True
 
 
@@ -293,6 +307,27 @@ def test_illegal_command_marks_non_trainable(monkeypatch):
     assert note["kind"] == "illegal"
     assert note["action_index"] == 1
     assert buf[0]["policy_trainable"] is False
+
+
+def test_dominated_action_command_adds_trainable_note(monkeypatch):
+    _load_lib()
+    state = _state(floating_mana=ManaPool(U=2))
+    inputs = iter(["d", "1", "strictly worse line", "0"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    buf = []
+    _manual_choose_action(
+        state,
+        [_cast("Gitaxian Probe"), _cast("Rite of Flame")],
+        step=0, observation_buffer=buf, seed=1,
+    )
+    note = buf[0]["manual_notes"][0]
+    assert note == {
+        "kind": "dominated_action",
+        "action_index": 1,
+        "text": "strictly worse line",
+        "policy_trainable": True,
+    }
+    assert buf[0]["policy_trainable"] is True
 
 
 def test_resolution_command_taints_state_and_future(monkeypatch):

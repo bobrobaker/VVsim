@@ -75,15 +75,14 @@ def test_grim_monolith_cannot_tap_while_tapped():
 
 # ── Lotus Petal ───────────────────────────────────────────────────────────────
 
-def test_lotus_petal_offers_three_colors():
+def test_lotus_petal_offers_ur_colors():
     perm = Permanent(card_name="Lotus Petal")
     state = _make_state(battlefield=[perm])
     acts = _actions_for(state, "Lotus Petal")
-    colors = {a.effects.add_mana.U + a.effects.add_mana.R + a.effects.add_mana.C for a in acts}
-    assert len(acts) == 3
+    assert len(acts) == 2
     assert any(a.effects.add_mana.U == 1 for a in acts)
     assert any(a.effects.add_mana.R == 1 for a in acts)
-    assert any(a.effects.add_mana.C == 1 for a in acts)
+    assert not any(a.effects.add_mana.C == 1 for a in acts)
 
 
 def test_lotus_petal_sacrifice_goes_to_graveyard():
@@ -118,10 +117,10 @@ def test_mox_opal_mana_with_metalcraft():
              Permanent(card_name="Mana Vault")]
     state = _make_state(battlefield=perms)
     acts = _actions_for(state, "Mox Opal")
-    assert len(acts) == 3
+    assert len(acts) == 2
     assert any(a.effects.add_mana.U == 1 for a in acts)
     assert any(a.effects.add_mana.R == 1 for a in acts)
-    assert any(a.effects.add_mana.C == 1 for a in acts)
+    assert not any(a.effects.add_mana.C == 1 for a in acts)
 
 
 def test_mox_opal_cannot_tap_while_tapped():
@@ -191,13 +190,13 @@ def test_chrome_mox_no_colorless_from_imprint():
 
 # ── Mox Diamond ──────────────────────────────────────────────────────────────
 
-def test_mox_diamond_taps_for_u_r_c():
+def test_mox_diamond_taps_for_u_r():
     perm = Permanent(card_name="Mox Diamond")
     state = _make_state(battlefield=[perm])
     acts = _actions_for(state, "Mox Diamond")
     assert any(a.effects.add_mana.U == 1 for a in acts)
     assert any(a.effects.add_mana.R == 1 for a in acts)
-    assert any(a.effects.add_mana.C == 1 for a in acts)
+    assert not any(a.effects.add_mana.C == 1 for a in acts)
 
 
 def test_mox_diamond_cannot_tap_while_tapped():

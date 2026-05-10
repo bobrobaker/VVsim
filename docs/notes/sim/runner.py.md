@@ -13,3 +13,4 @@
 ## Recent changes
 - 2026-05-07: `_manual_choose_action` now calls `rank_actions`, shows scores/delta/reasons, prompts for reason on non-top choice, writes JSONL via `_write_adjustment_log`. `RunConfig` gained `policy_config_path` and `adjustment_log_path`.
 - 2026-05-07: Added `Exile:` display block to `_manual_choose_action`; printed only when nonempty.
+- 2026-05-09: Manual-mode JSONL entries include shared `run_id`/`session_id`; manual observation ranked actions and policy-adjustment `all_scored` entries serialize action `costs`/`effects`.

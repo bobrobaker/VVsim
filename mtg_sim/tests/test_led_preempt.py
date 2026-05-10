@@ -270,6 +270,30 @@ def test_policy_prefers_led_crack_over_resolve_when_hand_small():
     )
 
 
+def test_policy_prefers_pending_draw_over_non_win_instant_cast():
+    """A spell still castable after drawing should not jump a top Curiosity trigger."""
+    state = _make_state(["Swan Song"], floating_mana=ManaPool(U=1))
+    target = StackObject(card_name="Rite of Flame")
+    draw_trigger = StackObject(card_name="_DrawTrigger", is_draw_trigger=True, draw_count=3)
+    state.stack.extend([target, draw_trigger])
+
+    actions = generate_actions(state)
+    draw_action = next(
+        a for a in actions
+        if a.action_type == RESOLVE_STACK_OBJECT and a.target == draw_trigger.stack_id
+    )
+    swan_action = next(
+        a for a in actions
+        if a.action_type == CAST_SPELL and a.source_card == "Swan Song"
+    )
+
+    draw_score = score_action(state, draw_action)
+    swan_score = score_action(state, swan_action)
+
+    assert draw_score > swan_score
+    assert choose_action(state, actions) == draw_action
+
+
 def test_led_crack_heuristic_only_fires_with_small_hand():
     """
     _led_crack_is_better must return False when hand has > 1 card,

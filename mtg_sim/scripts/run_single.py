@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run a single simulation and print the trace."""
 import argparse
+import random
 import sys
 from pathlib import Path
 
@@ -18,10 +19,11 @@ DEFAULT_OBSERVATION_LOG = Path(__file__).parent / "logs" / "manual_observations.
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run a single Vivi chain simulation")
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Random seed (default: random)")
     parser.add_argument("--hand", nargs="*", default=[], help="Starting hand card names")
-    parser.add_argument("--mana-u", type=int, default=1, help="Starting U mana")
-    parser.add_argument("--mana-r", type=int, default=0, help="Starting R mana")
+    parser.add_argument("--mana-u", type=int, default=0, help="Starting U mana")
+    parser.add_argument("--mana-r", type=int, default=1, help="Starting R mana")
     parser.add_argument("--mana-c", type=int, default=0, help="Starting colorless mana")
     parser.add_argument("--curiosity-count", type=int, default=1)
     parser.add_argument("--short", action="store_true", help="Print summary only")
@@ -38,6 +40,7 @@ def main() -> None:
     parser.add_argument("--deck-ids", nargs="*", type=int, default=None,
                         help="Card IDs for active deck (default: IDs 2-100)")
     args = parser.parse_args()
+    seed = args.seed if args.seed is not None else random.randrange(2**32)
 
     load_card_library(str(DEFAULT_LIBRARY))
     active_deck = build_active_deck(args.deck_ids)
@@ -47,7 +50,7 @@ def main() -> None:
             print(f"WARNING: '{c}' not in active deck", file=sys.stderr)
 
     config = RunConfig(
-        seed=args.seed,
+        seed=seed,
         starting_hand=args.hand,
         starting_floating_mana=ManaPool(U=args.mana_u, R=args.mana_r, C=args.mana_c),
         curiosity_effect_count=args.curiosity_count,
@@ -59,6 +62,7 @@ def main() -> None:
     )
 
     result = simulate_run(config, active_deck)
+    print(f"Seed    : {seed}")
     print(format_trace(result, show_full=not args.short))
 
 

@@ -322,15 +322,14 @@ def test_gemstone_caverns_no_luck_counter_produces_colorless():
     assert actions[0].effects.add_mana.R == 0
 
 
-def test_gemstone_caverns_with_luck_counter_produces_any_color():
+def test_gemstone_caverns_with_luck_counter_produces_ur_only():
     perm = Permanent(card_name="Gemstone Caverns")
     perm.counters["luck_counter"] = 1
     state = _make_state(battlefield=[perm])
     actions = [a for a in _mana_actions(state) if a.source_card == "Gemstone Caverns"]
-    colors_produced = {tuple(sorted([(c, v) for c, v in [("U", a.effects.add_mana.U), ("R", a.effects.add_mana.R), ("C", a.effects.add_mana.C)] if v > 0])) for a in actions}
     assert any(a.effects.add_mana.U == 1 for a in actions)
     assert any(a.effects.add_mana.R == 1 for a in actions)
-    assert any(a.effects.add_mana.C == 1 for a in actions)
+    assert not any(a.effects.add_mana.C == 1 for a in actions)
 
 
 # ── Cavern of Souls ───────────────────────────────────────────────────────────

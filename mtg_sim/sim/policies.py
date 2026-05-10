@@ -50,6 +50,7 @@ _DEFAULTS: dict = {
         "free_alt_cost_bonus":      25.0,
         "tight_mana_penalty":       -20.0,
         "red_spend_penalty":        -30.0,  # spending last red when win card needs it
+        "pending_draw_deferral_penalty": -45.0,
         # Pitched-card penalties (exiling from hand)
         "pitch_base_penalty":       -40.0,
         "pitch_priority_extra":     -80.0,  # additional penalty for high-priority pitched cards
@@ -66,6 +67,7 @@ _DEFAULTS: dict = {
         "no_target_fallback":       20.0,
         "draw_trigger":             142.0,
         "draw_trigger_led_preempt": 30.0,
+        "mana_producer_priority":   190.0,
         "mana_producer":            85.0,
         "engine_card":              80.0,
         "default":                  40.0,
@@ -315,6 +317,10 @@ def score_action_with_reasons(
             score += cs["red_spend_penalty"]
             reasons.append("red_spend_penalty")
 
+        if _should_defer_cast_to_pending_draw(state, action):
+            score += cs["pending_draw_deferral_penalty"]
+            reasons.append("pending_draw_deferral")
+
         return score, reasons
 
     # ── Resolve stack object ──────────────────────────────────────────────────
@@ -330,6 +336,8 @@ def score_action_with_reasons(
             return rc["draw_trigger"], ["draw_trigger"]
 
         if _will_produce_mana(obj.card_name):
+            if _should_prioritize_mana_producer_resolution(state, obj.card_name):
+                return rc["mana_producer_priority"], ["mana_producer_priority"]
             return rc["mana_producer"], ["mana_producer"]
 
         if _is_engine_card(obj.card_name):
@@ -436,6 +444,28 @@ def _will_produce_mana(card_name: str) -> bool:
         "Springleaf Drum", "Jeweled Amulet",
     }
     return card_name in MANA_PRODUCERS
+
+
+def _should_prioritize_mana_producer_resolution(
+    state: GameState,
+    card_name: str,
+) -> bool:
+    """Prefer turning pending mana-producing spells into mana before other work."""
+    if not _will_produce_mana(card_name):
+        return False
+    if not state.stack:
+        return False
+    top = state.stack[-1]
+    return top.card_name == card_name and not top.is_draw_trigger
+
+
+def _should_defer_cast_to_pending_draw(state: GameState, action: Action) -> bool:
+    """Prefer resolving a top Curiosity draw before non-win casts."""
+    if not state.stack or not state.stack[-1].is_draw_trigger:
+        return False
+    if action.source_card in EXTRA_TURN_WIN_CARDS:
+        return False
+    return True
 
 
 def _led_crack_is_better(state: GameState) -> bool:

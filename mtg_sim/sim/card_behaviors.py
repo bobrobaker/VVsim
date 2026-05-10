@@ -104,7 +104,7 @@ class LotusPetalBehavior(CardBehavior):
                 effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
                 risk_level=RISK_SAFE,
             )
-            for color in ("U", "R", "C")
+            for color in ("U", "R")
         ]
 
 
@@ -117,7 +117,7 @@ class LionsEyeDiamondBehavior(CardBehavior):
         if perm.tapped:
             return []
         actions = []
-        for color, label in [("R", "RRR"), ("U", "UUU"), ("C", "CCC")]:
+        for color, label in [("R", "RRR"), ("U", "UUU")]:
             actions.append(Action(
                 action_type=SACRIFICE_FOR_MANA,
                 source_card="Lion's Eye Diamond",
@@ -251,7 +251,7 @@ class MoxDiamondBehavior(CardBehavior):
                 effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
                 risk_level=RISK_SAFE,
             )
-            for color in ("U", "R", "C")
+            for color in ("U", "R")
         ]
 
 
@@ -272,7 +272,7 @@ class MoxOpalBehavior(CardBehavior):
                 effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
                 risk_level=RISK_SAFE,
             )
-            for color in ("U", "R", "C")
+            for color in ("U", "R")
         ]
 
 
@@ -318,7 +318,7 @@ class SpringleafDrumBehavior(CardBehavior):
                 risk_level=RISK_SAFE,
                 alt_cost_type=f"tap_creature:{cid}",
             )
-            for color in ("U", "R", "C")
+            for color in ("U", "R")
         ]
 
 
@@ -518,38 +518,34 @@ class IntuitionBehavior(CardBehavior):
 
 # ── Spell: Dizzy Spell ────────────────────────────────────────────────────────
 
-def _is_creature_perm(perm) -> bool:
-    from .cards import get_card
-    cd = get_card(perm.card_name)
-    return cd is not None and cd.is_creature
-
-
 class DizzySpellBehavior(CardBehavior):
     # Power reduction ignored.
     _TRANSMUTE_PREFERRED = ["Gitaxian Probe", "Twisted Image", "Sol Ring", "Mana Vault", "Rite of Flame"]
 
     def generate_actions(self, state, card_name):
-        from .action_generator import _gen_normal_and_alt_cast_actions
         from .cards import get_card
         cd = get_card(card_name)
         if cd is None or card_name not in state.hand:
             return []
         actions = []
-        # Instant spell mode: requires a creature target (Vivi is always present)
-        has_creature_target = any(p.card_name for p in state.battlefield if _is_creature_perm(p))
-        if has_creature_target:
+        # Instant spell mode: requires a creature target.
+        from .action_generator import _get_harmful_creature_targets
+        targets = _get_harmful_creature_targets(state)
+        if targets:
             from .mana import can_pay_cost
             from .mana import ManaCost
             cost = ManaCost(pip_u=cd.pip_u, generic=cd.generic_mana)
             if can_pay_cost(state.floating_mana, cost):
-                # No specific target encoded; resolution is a no-op
-                actions.append(Action(
-                    action_type=CAST_SPELL,
-                    source_card=card_name,
-                    description=f"Cast {card_name} (targeting creature)",
-                    costs=CostBundle(mana=cost),
-                    risk_level=RISK_NORMAL,
-                ))
+                for t_id, t_name in targets:
+                    actions.append(Action(
+                        action_type=CAST_SPELL,
+                        source_card=card_name,
+                        description=f"Cast {card_name} targeting {t_name}",
+                        costs=CostBundle(mana=cost),
+                        requires_target=True,
+                        target=t_id,
+                        risk_level=RISK_NORMAL,
+                    ))
         # Transmute mode: sorcery speed only
         if not state.stack:
             actions.append(Action(
@@ -746,7 +742,7 @@ class MoggSalvageBehavior(CardBehavior):
 
 class StrikeItRichBehavior(CardBehavior):
     def resolve_cast(self, state, stack_obj):
-        # Creates a Treasure token (sacrifice for any color)
+        # Creates a Treasure token (sacrifice for U/R in this UR-only sim)
         from .state import Permanent
         treasure = Permanent(card_name="_Treasure", tapped=False)
         state.battlefield.append(treasure)
@@ -825,14 +821,14 @@ class SnapbackBehavior(CardBehavior):
     # Bounces a creature; not a counterspell.
 
     def generate_actions(self, state, card_name):
-        from .action_generator import _get_creature_targets, _blue_cards_in_hand_except, _make_cast_action
+        from .action_generator import _get_harmful_creature_targets, _blue_cards_in_hand_except, _make_cast_action
         from .mana import can_pay_cost
         from .cards import get_card
         cd = get_card(card_name)
         if cd is None:
             return []
         actions = []
-        targets = _get_creature_targets(state)
+        targets = _get_harmful_creature_targets(state)
         if not targets:
             return []
         normal_cost = ManaCost(pip_u=cd.pip_u, generic=cd.generic_mana)
@@ -1022,16 +1018,16 @@ class GutShotBehavior(CardBehavior):
     # Damage ignored; useful as free spell/draw trigger.
 
     def generate_actions(self, state, card_name):
-        from .action_generator import _get_creature_targets, _make_cast_action
+        from .action_generator import _get_harmful_creature_targets, _make_cast_action
         from .mana import can_pay_cost
         from .cards import get_card
         cd = get_card(card_name)
         if cd is None:
             return []
         actions = []
-        targets = _get_creature_targets(state)
-        # Add dummy player as a target
-        targets = targets + [("_player_self", "[self/player]")]
+        targets = _get_harmful_creature_targets(state)
+        if not targets:
+            targets = [("_player_self", "[self/player]")]
         normal_cost = ManaCost(pip_r=cd.pip_r, generic=cd.generic_mana)
         if can_pay_cost(state.floating_mana, normal_cost):
             for t_id, t_name in targets:
@@ -1062,14 +1058,14 @@ class PyrokinesisBehavior(CardBehavior):
     # Damage ignored; useful as free spell/draw trigger.
 
     def generate_actions(self, state, card_name):
-        from .action_generator import _get_creature_targets, _red_cards_in_hand_except, _make_cast_action
+        from .action_generator import _get_harmful_creature_targets, _red_cards_in_hand_except, _make_cast_action
         from .mana import can_pay_cost
         from .cards import get_card
         cd = get_card(card_name)
         if cd is None:
             return []
         actions = []
-        targets = _get_creature_targets(state)
+        targets = _get_harmful_creature_targets(state)
         if not targets:
             return []
         normal_cost = ManaCost(pip_r=cd.pip_r, generic=cd.generic_mana)
@@ -1098,13 +1094,17 @@ class PyrokinesisBehavior(CardBehavior):
 # ── Spell: Redirect Lightning ─────────────────────────────────────────────────
 
 class RedirectLightningBehavior(CardBehavior):
-    # Life-payment mode only; target single-target stack object. Redirection ignored.
+    # Requires normal {R} cost plus ignored additional life payment; redirection ignored.
 
     def generate_actions(self, state, card_name):
         from .action_generator import _get_single_target_stack_objects
         from .cards import get_card
+        from .mana import ManaCost, can_pay_cost
         cd = get_card(card_name)
         if cd is None:
+            return []
+        cost = ManaCost(pip_r=cd.pip_r, generic=cd.generic_mana)
+        if not can_pay_cost(state.floating_mana, cost):
             return []
         targets = _get_single_target_stack_objects(state)
         actions = []
@@ -1113,7 +1113,7 @@ class RedirectLightningBehavior(CardBehavior):
                 action_type=CAST_SPELL,
                 source_card=card_name,
                 description=f"Cast {card_name} (pay life) targeting {t_name}",
-                costs=CostBundle(pay_life=5),
+                costs=CostBundle(mana=cost, pay_life=5),
                 requires_target=True,
                 target=t_id,
                 risk_level=RISK_SAFE,
@@ -1156,14 +1156,14 @@ class ThunderclapBehavior(CardBehavior):
     # Kills Ragavan/Tandem Lookout if targeted; dummy target ignored.
 
     def generate_actions(self, state, card_name):
-        from .action_generator import _get_creature_targets, _we_control_mountain, _make_cast_action
+        from .action_generator import _get_harmful_creature_targets, _we_control_mountain, _make_cast_action
         from .mana import can_pay_cost
         from .cards import get_card
         cd = get_card(card_name)
         if cd is None:
             return []
         actions = []
-        targets = _get_creature_targets(state)
+        targets = _get_harmful_creature_targets(state)
         if not targets:
             return []
         normal_cost = ManaCost(pip_r=cd.pip_r, generic=cd.generic_mana)
@@ -1295,7 +1295,7 @@ class TreasureBehavior(CardBehavior):
                 effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
                 risk_level=RISK_SAFE,
             )
-            for color in ("U", "R", "C")
+            for color in ("U", "R")
         ]
 
 
@@ -2007,7 +2007,7 @@ class FieryIsletBehavior(CardBehavior):
 
 
 class GemstonesCavernsBehavior(CardBehavior):
-    """Taps for any color if luck counter present, else colorless only."""
+    """Taps for U/R if luck counter present, else colorless only."""
     def generate_mana_actions(self, state, perm):
         if perm.tapped:
             return []
@@ -2022,7 +2022,7 @@ class GemstonesCavernsBehavior(CardBehavior):
                     effects=EffectBundle(add_mana=ManaPool(**{color: 1})),
                     risk_level=RISK_SAFE,
                 )
-                for color in ("U", "R", "C")
+                for color in ("U", "R")
             ]
         return [Action(
             action_type=ACTIVATE_MANA_ABILITY,

@@ -582,10 +582,10 @@ Tests: generates normal/pitch actions; pitch requires red card and exiles it; re
 Comments: "Damage ignored; card is useful as free spell/draw trigger."
 
 ### Redirect Lightning
-Action gen: instant speed; life-payment mode only; target spell/ability with a single target.
+Action gen: instant speed; `{R}` plus ignored life payment; target spell/ability with a single target.
 Resolution: no modeled effect.
-Tests: generates only with legal single-target stack object.
-Comments: "Life payment and actual redirection/damage ignored; minimal tests needed."
+Tests: generates only with legal single-target stack object and available red mana.
+Comments: "Life payment and actual redirection/damage ignored; red mana cost still required."
 
 ### Repeal
 Action gen: instant speed; target nonland permanent with MV <= X.

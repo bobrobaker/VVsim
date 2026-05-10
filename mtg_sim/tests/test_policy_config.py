@@ -239,6 +239,78 @@ def test_draw_trigger_ranks_above_one_mana_non_win_cast():
     assert "draw_trigger" in ranked[0].reasons
 
 
+def test_mana_producer_resolve_ranks_above_paid_cast():
+    _load_lib()
+    cfg = load_policy_config()
+    state = _state(floating_mana=ManaPool(U=1))
+    rite = StackObject(card_name="Rite of Flame")
+    state.stack.append(rite)
+
+    resolve_rite = Action(
+        action_type=RESOLVE_STACK_OBJECT,
+        source_card="Rite of Flame",
+        description="Resolve Rite of Flame",
+        target=rite.stack_id,
+        risk_level=RISK_SAFE,
+    )
+    paid_cast = _cast("Brainstorm", mana_u=1)
+
+    ranked = rank_actions(state, [paid_cast, resolve_rite], cfg)
+    assert ranked[0].action is resolve_rite
+    assert ranked[0].score > ranked[1].score
+    assert "mana_producer_priority" in ranked[0].reasons
+
+
+def test_truly_free_cast_can_rank_above_mana_producer_resolve():
+    _load_lib()
+    cfg = load_policy_config()
+    state = _state()
+    rite = StackObject(card_name="Rite of Flame")
+    state.stack.append(rite)
+
+    resolve_rite = Action(
+        action_type=RESOLVE_STACK_OBJECT,
+        source_card="Rite of Flame",
+        description="Resolve Rite of Flame",
+        target=rite.stack_id,
+        risk_level=RISK_SAFE,
+    )
+    probe = _cast("Gitaxian Probe")
+    probe.alt_cost_type = "pay_life"
+
+    ranked = rank_actions(state, [resolve_rite, probe], cfg)
+    assert ranked[0].action is probe
+    assert "free_cost" in ranked[0].reasons
+    assert "free_alt_cost" in ranked[0].reasons
+
+
+def test_mana_producer_resolve_ranks_above_mana_activation():
+    _load_lib()
+    cfg = load_policy_config()
+    state = _state(floating_mana=ManaPool(R=1), hand=["Final Fortune"])
+    rite = StackObject(card_name="Rite of Flame")
+    state.stack.append(rite)
+
+    resolve_rite = Action(
+        action_type=RESOLVE_STACK_OBJECT,
+        source_card="Rite of Flame",
+        description="Resolve Rite of Flame",
+        target=rite.stack_id,
+        risk_level=RISK_SAFE,
+    )
+    activate_mox = Action(
+        action_type=ACTIVATE_MANA_ABILITY,
+        source_card="Mox Amber",
+        description="Tap Mox Amber for {R}",
+        effects=EffectBundle(add_mana=ManaPool(R=1)),
+        risk_level=RISK_SAFE,
+    )
+
+    ranked = rank_actions(state, [activate_mox, resolve_rite], cfg)
+    assert ranked[0].action is resolve_rite
+    assert ranked[0].score > ranked[1].score
+
+
 # ── Pitch penalty ─────────────────────────────────────────────────────────────
 
 _LIB = Path(__file__).parent.parent.parent / "card_library.csv"

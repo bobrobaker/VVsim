@@ -70,15 +70,23 @@ def test_snapback_generates_pitch_blue_with_creature_target():
     assert len(pitch_acts) >= 1, "Snapback should generate pitch-blue actions"
 
 
-def test_snapback_bounces_own_creature_to_hand():
+def test_snapback_prunes_own_vivi_when_dummy_target_exists():
     state = _state(["Snapback"], ManaPool(U=1, ANY=1))
-    # Vivi is on battlefield; get its perm_id
     vivi_perm = next(p for p in state.battlefield if p.card_name == "Vivi Ornitier")
     actions = generate_actions(state)
-    act = next(a for a in actions if a.source_card == "Snapback"
-               and a.target == vivi_perm.perm_id)
+    acts = [a for a in actions if a.source_card == "Snapback"]
+    assert acts
+    assert all(a.target != vivi_perm.perm_id for a in acts)
+    assert all(a.target == state._opponent_creature_perm.perm_id for a in acts)
+
+
+def test_snapback_can_target_own_creature_without_dummy_target():
+    state = _state(["Snapback"], ManaPool(U=1, ANY=1))
+    state._opponent_creature_perm = None
+    vivi_perm = next(p for p in state.battlefield if p.card_name == "Vivi Ornitier")
+    actions = generate_actions(state)
+    act = next(a for a in actions if a.source_card == "Snapback" and a.target == vivi_perm.perm_id)
     resolve_action(state, act)
-    # Resolve the stack object
     from mtg_sim.sim.actions import RESOLVE_STACK_OBJECT
     res_acts = [a for a in generate_actions(state) if a.action_type == RESOLVE_STACK_OBJECT]
     if res_acts:
@@ -412,6 +420,19 @@ def test_pyrokinesis_requires_creature_target():
     assert all(a.requires_target and a.target is not None for a in acts)
 
 
+def test_harmful_creature_spells_prune_own_vivi_when_dummy_target_exists():
+    for card_name in ("Gut Shot", "Pyrokinesis", "Thunderclap"):
+        mana = ManaPool(R=1, ANY=2) if card_name == "Thunderclap" else ManaPool()
+        hand = [card_name, "Rite of Flame"] if card_name == "Pyrokinesis" else [card_name]
+        state = _state(hand, mana)
+        vivi_perm = next(p for p in state.battlefield if p.card_name == "Vivi Ornitier")
+        actions = generate_actions(state)
+        acts = [a for a in actions if a.source_card == card_name]
+        assert acts
+        assert all(a.target != vivi_perm.perm_id for a in acts)
+        assert all(a.target == state._opponent_creature_perm.perm_id for a in acts)
+
+
 def test_pyrokinesis_pitch_requires_red_card():
     state = _state(["Pyrokinesis"], ManaPool())
     actions = generate_actions(state)
@@ -441,7 +462,7 @@ def test_redirect_lightning_no_actions_without_stack_target():
 
 def test_redirect_lightning_generates_with_valid_stack_object():
     from mtg_sim.sim.stack import StackObject
-    state = _state(["Redirect Lightning"], ManaPool())
+    state = _state(["Redirect Lightning"], ManaPool(R=1))
     # Add a single-target spell to stack
     so = StackObject(card_name="Twisted Image", targets=["some_target"])
     state.stack.append(so)
@@ -449,6 +470,17 @@ def test_redirect_lightning_generates_with_valid_stack_object():
     acts = [a for a in actions if a.source_card == "Redirect Lightning"]
     assert len(acts) >= 1
     assert acts[0].alt_cost_type == "pay_life"
+    assert acts[0].costs.mana.pip_r == 1
+    assert acts[0].costs.pay_life == 5
+
+
+def test_redirect_lightning_requires_red_mana_with_valid_stack_object():
+    from mtg_sim.sim.stack import StackObject
+    state = _state(["Redirect Lightning"], ManaPool())
+    state.stack.append(StackObject(card_name="Twisted Image", targets=["some_target"]))
+    actions = generate_actions(state)
+    acts = [a for a in actions if a.source_card == "Redirect Lightning"]
+    assert len(acts) == 0
 
 
 # ── Secret Identity ───────────────────────────────────────────────────────────

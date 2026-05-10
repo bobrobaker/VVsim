@@ -590,7 +590,8 @@ def _default_mana_actions(state: GameState, perm, cd) -> list[Action]:
             for color in ("U", "R")
         ]
 
-    # All other flexible sources ("any", "any_or_C", etc.) → U, R, or C
+    # All other flexible sources ("any", "any_or_C", etc.) → U or R.
+    # Colorless is dominated in this UR-only sim unless the source is truly colorless-only.
     return [
         Action(
             action_type=ACTIVATE_MANA_ABILITY,
@@ -600,7 +601,7 @@ def _default_mana_actions(state: GameState, perm, cd) -> list[Action]:
             effects=EffectBundle(add_mana=ManaPool(**{color: amount})),
             risk_level=RISK_SAFE,
         )
-        for color in ("U", "R", "C")
+        for color in ("U", "R")
     ]
 
 
@@ -676,6 +677,18 @@ def _get_creature_targets(state: GameState) -> list[tuple[str, str]]:
     opp = state._opponent_creature_perm
     if opp:
         targets.append((opp.perm_id, "[opponent dummy creature]"))
+    return targets
+
+
+def _get_harmful_creature_targets(state: GameState) -> list[tuple[str, str]]:
+    """Targets for harmful creature spells; prefer opponent dummy over own Vivi."""
+    creature_targets = _get_creature_targets(state)
+    opp = state._opponent_creature_perm
+    if not opp:
+        return creature_targets
+    targets = [(tid, name) for tid, name in creature_targets if name != "Vivi Ornitier"]
+    if not any(tid == opp.perm_id for tid, _ in targets):
+        targets.insert(0, (opp.perm_id, "[opponent dummy creature]"))
     return targets
 
 
