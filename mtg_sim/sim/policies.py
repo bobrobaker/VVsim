@@ -45,6 +45,8 @@ _DEFAULTS: dict = {
         "tutor_bonus":              25.0,
         "draw_spell_bonus":         20.0,
         "own_stack_target_bonus":   15.0,
+        "opponent_dummy_target_bonus": 2.0,
+        "vivi_target_penalty":       -2.0,
         "free_alt_cost_bonus":      25.0,
         "tight_mana_penalty":       -20.0,
         "red_spend_penalty":        -30.0,  # spending last red when win card needs it
@@ -271,6 +273,15 @@ def score_action_with_reasons(
             if obj:
                 score += cs["own_stack_target_bonus"]
                 reasons.append("own_stack_target")
+            else:
+                target_perm = state.get_perm_by_id(action.target)
+                if target_perm is not None:
+                    if target_perm.card_name.startswith("_opponent"):
+                        score += cs["opponent_dummy_target_bonus"]
+                        reasons.append("opponent_dummy_target")
+                    elif target_perm.card_name == "Vivi Ornitier":
+                        score += cs["vivi_target_penalty"]
+                        reasons.append("vivi_target")
 
         if action.alt_cost_type in ("pay_life", "commander_free", "delayed_upkeep"):
             score += cs["free_alt_cost_bonus"]

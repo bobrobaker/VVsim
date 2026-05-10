@@ -17,6 +17,8 @@ free_mana_source_bonus   = 55.0     # free permanent that produces mana (Lotus P
 tutor_bonus              = 25.0     # any tutor in the TUTORS set
 draw_spell_bonus         = 20.0     # Gitaxian Probe / Twisted Image / Repeal
 own_stack_target_bonus   = 15.0     # counterspell targeting own stack object
+opponent_dummy_target_bonus = 2.0   # prefer harmless opponent dummy permanent targets
+vivi_target_penalty      = -2.0     # slightly avoid bouncing/removing Vivi when alternatives exist
 free_alt_cost_bonus      = 25.0     # pay_life / commander_free / delayed_upkeep alt cost
 tight_mana_penalty       = -20.0    # applied when effective_cost >= 3 and mana pool <= 2
 red_spend_penalty        = -30.0    # spending last red on non-ritual while win card needs red

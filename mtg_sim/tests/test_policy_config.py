@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mtg_sim.sim.state import GameState
+from mtg_sim.sim.state import GameState, Permanent
 from mtg_sim.sim.mana import ManaPool, ManaCost
 from mtg_sim.sim.actions import (
     Action, CostBundle, EffectBundle,
@@ -157,6 +157,61 @@ def test_rank_actions_reasons_nonempty():
     state = _state(floating_mana=ManaPool(U=1))
     ranked = rank_actions(state, [_cast("Gitaxian Probe")], cfg)
     assert ranked[0].reasons  # at least one reason label
+
+
+def test_permanent_target_policy_prefers_dummy_over_vivi():
+    _load_lib()
+    cfg = load_policy_config()
+    vivi = Permanent(card_name="Vivi Ornitier")
+    state = _state(battlefield=[vivi])
+    dummy = state._opponent_creature_perm
+
+    target_vivi = Action(
+        action_type=CAST_SPELL,
+        source_card="Chain of Vapor",
+        description="Cast Chain of Vapor targeting Vivi",
+        costs=CostBundle(mana=ManaCost(pip_u=1)),
+        requires_target=True,
+        target=vivi.perm_id,
+        risk_level=RISK_NORMAL,
+    )
+    target_dummy = Action(
+        action_type=CAST_SPELL,
+        source_card="Chain of Vapor",
+        description="Cast Chain of Vapor targeting dummy",
+        costs=CostBundle(mana=ManaCost(pip_u=1)),
+        requires_target=True,
+        target=dummy.perm_id,
+        risk_level=RISK_NORMAL,
+    )
+
+    vivi_score, vivi_reasons = score_action_with_reasons(state, target_vivi, cfg)
+    dummy_score, dummy_reasons = score_action_with_reasons(state, target_dummy, cfg)
+
+    assert dummy_score > vivi_score
+    assert "opponent_dummy_target" in dummy_reasons
+    assert "vivi_target" in vivi_reasons
+
+
+def test_chain_of_vapor_policy_ranks_dummy_target_above_vivi():
+    _load_lib()
+    from mtg_sim.sim.action_generator import generate_actions
+
+    cfg = load_policy_config()
+    vivi = Permanent(card_name="Vivi Ornitier")
+    state = _state(
+        hand=["Chain of Vapor"],
+        battlefield=[vivi],
+        floating_mana=ManaPool(U=1),
+    )
+
+    chain_actions = [
+        a for a in generate_actions(state)
+        if a.action_type == CAST_SPELL and a.source_card == "Chain of Vapor"
+    ]
+    ranked = rank_actions(state, chain_actions, cfg)
+
+    assert ranked[0].action.target == state._opponent_creature_perm.perm_id
 
 
 def test_draw_trigger_ranks_above_one_mana_non_win_cast():
