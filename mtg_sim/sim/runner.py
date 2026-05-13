@@ -10,9 +10,9 @@ from .state import GameState, Permanent, ActionLog, OPPONENT_COUNT
 from .actions import (
     WIN_EXTRA_TURN, WIN_NONCREATURE_SPELL_COUNT,
     BRICK_NO_ACTIONS, BRICK_NO_USEFUL_ACTIONS, ERROR_INVALID_STATE,
-    EXTRA_TURN_WIN_CARDS, NONCREATURE_SPELL_WIN_THRESHOLD,
+    NONCREATURE_SPELL_WIN_THRESHOLD,
 )
-from .cards import get_card
+from .card_behaviors import CARD_BEHAVIORS
 from .action_generator import generate_actions
 from .resolver import resolve_action, draw_cards
 from .policies import choose_action, rank_actions, load_policy_config
@@ -188,44 +188,24 @@ def _simulate_loop(
 
 
 def _check_win(state: GameState) -> tuple[str, str]:
-    # Extra-turn card successfully cast = it's now on the stack. Wins immediately.
     for obj in state.stack:
-        if obj.card_name in EXTRA_TURN_WIN_CARDS:
-            return WIN_EXTRA_TURN, obj.card_name
+        beh = CARD_BEHAVIORS.get(obj.card_name)
+        if not beh:
+            continue
+        outcome, winning_card = beh.check_win(state, obj.card_name)
+        if outcome:
+            return outcome, winning_card
     if state.noncreature_spells_cast >= NONCREATURE_SPELL_WIN_THRESHOLD:
         return WIN_NONCREATURE_SPELL_COUNT, f"{state.noncreature_spells_cast} spells"
-    bf_names = {p.card_name for p in state.battlefield}
-    # Quicksilver Elemental on battlefield + {U} floating = deterministic win.
-    if "Quicksilver Elemental" in bf_names and state.floating_mana.U >= 1:
-        return WIN_EXTRA_TURN, "Quicksilver Elemental"
-    # Hullbreaker Horror on battlefield + spell on stack + 2 eligible mana permanents = loop win.
-    if "Hullbreaker Horror" in bf_names and state.stack:
-        eligible = sum(
-            1 for p in state.battlefield
-            if _is_hullbreaker_eligible(p.card_name)
-        )
-        if eligible >= 2:
-            return WIN_EXTRA_TURN, "Hullbreaker Horror"
+    checked_battlefield_cards = {p.card_name for p in state.battlefield}
+    for card_name in checked_battlefield_cards:
+        beh = CARD_BEHAVIORS.get(card_name)
+        if not beh:
+            continue
+        outcome, winning_card = beh.check_win(state, card_name)
+        if outcome:
+            return outcome, winning_card
     return "", ""
-
-
-def _is_hullbreaker_eligible(card_name: str) -> bool:
-    """Nonland, nontoken, reusable, non-sacrifice mana source that is mana-neutral-or-better."""
-    cd = get_card(card_name)
-    if cd is None:
-        return False
-    if cd.is_land:
-        return False
-    if not cd.produces_mana:
-        return False
-    if cd.requires_sacrifice:
-        return False
-    if cd.mana_timing not in ("repeatable", "conditional"):
-        return False
-    try:
-        return int(cd.mana_amount) >= cd.mv
-    except (ValueError, TypeError):
-        return False
 
 
 def _manual_choose_action(

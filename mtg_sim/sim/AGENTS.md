@@ -23,7 +23,7 @@ Scope: simulation source files under `mtg_sim/sim/`.
 - Avoid turning strategic policy preferences into legality rules unless the task explicitly concerns candidate-action pruning.
 - Prefer small targeted changes over broad engine rewrites.
 - Preserve default simulator behavior unless the requested card or rule explicitly overrides it.
-- Do not model omitted real-card behavior unless `docs/card_specifics.md` says to model it.
+- Do not model omitted real-card behavior unless `docs/specs/card_specifics.md` says to model it.
 - For card-specific work, keep each behavior self-contained so later per-card file splits remain possible.
 
 ## Tests And Notes

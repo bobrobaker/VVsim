@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "implementation_result",
+  "title": "ImplementationResult",
+  "description": "JSON result returned by Codex after completing or failing an implementation task.",
+  "type": "object",
+  "required": ["task_id", "status", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Must match the task_id of the ImplementationTask."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "failed", "skipped"],
+      "description": "Outcome of the implementation attempt."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short human-readable summary of what was done or why it failed."
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of file paths that were modified, added, or deleted."
+    },
+    "validation_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "exit_code"],
+        "properties": {
+          "command": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "stdout": { "type": "string" },
+          "stderr": { "type": "string" }
+        }
+      },
+      "description": "Results of validation commands run by Codex."
+    },
+    "issues": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of problems, blockers, or uncertainties encountered."
+    },
+    "proposed_followup_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "description"],
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "description": "Follow-up tasks Codex proposes. Claude reviews these; Codex must NOT write them to tasks.json directly."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when Codex finished."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary key/value metadata (e.g. token usage, model, run duration).",
+      "additionalProperties": true
+    }
+  }
+}

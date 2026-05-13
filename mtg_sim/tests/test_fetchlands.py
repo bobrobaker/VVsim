@@ -1,4 +1,4 @@
-"""Tests for fetchland bucket (lines 49–102 of docs/card_specifics.md)."""
+"""Tests for fetchland bucket (lines 49-102 of docs/specs/card_specifics.md)."""
 import pytest
 from pathlib import Path
 from mtg_sim.sim.cards import load_card_library

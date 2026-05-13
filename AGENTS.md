@@ -68,7 +68,7 @@ Key files:
 
 ## Card-Specific Work
 
-- See `docs/workstream_card_specific.md` for the bucket workflow when implementing card-specific behavior.
+- See `docs/workstreams/card_specific.md` for the bucket workflow when implementing card-specific behavior.
 - Prefer card-specific logic in `card_behaviors.py`.
 - Keep `action_generator.py` as generic scaffolding where practical.
 - If a card needs special action generation, prefer `CardBehavior.generate_actions(...)`.
@@ -77,8 +77,8 @@ Key files:
 - Noncreature spell casts should still trigger Vivi/Curiosity through existing cast logic.
 - Permanent spells should enter battlefield through existing resolver logic unless the card says otherwise.
 - Nonpermanent spells should go to graveyard unless the card says otherwise.
-- Do not model omitted real-card behavior unless `docs/card_specifics.md` says to model it.
-- Add `Comments:` text from `docs/card_specifics.md` as an implementation comment when it explains a simulator simplification.
+- Do not model omitted real-card behavior unless `docs/specs/card_specifics.md` says to model it.
+- Add `Comments:` text from `docs/specs/card_specifics.md` as an implementation comment when it explains a simulator simplification.
 
 ## Policy Work
 
@@ -95,6 +95,18 @@ Key files:
 - If no focused test exists, explain what was and was not verified.
 - Documentation-only changes do not require the Python test suite.
 - Final reports should include files changed, behavior before/after, tests run, and remaining uncertainty.
+
+## Codex Task Mode (Route B)
+
+When launched non-interactively by `run_codex_task.py` or with a task artifact, follow bounded-implementer rules in `.agents/skills/codex-implementer/SKILL.md`:
+
+- Implement only what the task describes; report follow-ups in result JSON, do not expand scope.
+- Write an `ImplementationResult` JSON to `.agents/runs/<task_id>/<task_id>.result.json`.
+- Run all `validation_commands` before reporting success.
+- Do not add entries to `.agents/tasks.json` directly.
+- Do not read or edit `.claude/` files.
+
+In interactive mode, use normal Codex behavior and the working rules above.
 
 ## Task And Backlog Notes
 

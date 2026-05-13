@@ -15,6 +15,7 @@ from mtg_sim.sim.trace import format_trace
 DATA_DIR = Path(__file__).parent.parent.parent
 DEFAULT_LIBRARY = DATA_DIR / "card_library.csv"
 DEFAULT_OBSERVATION_LOG = Path(__file__).parent / "logs" / "manual_observations.jsonl"
+DEFAULT_ADJUSTMENT_LOG = Path(__file__).parent / "logs" / "policy_adjustments.jsonl"
 
 
 def main() -> None:
@@ -34,7 +35,7 @@ def main() -> None:
     parser.add_argument("--policy-config", type=Path, default=None,
                         help="Path to policy TOML config (default: mtg_sim/config/policy.toml)")
     parser.add_argument("--adjustment-log", type=Path, default=None,
-                        help="Path for policy adjustment JSONL log (default: logs/policy_adjustments.jsonl)")
+                        help="Path for policy adjustment JSONL log (default: mtg_sim/scripts/logs/policy_adjustments.jsonl)")
     parser.add_argument("--manual-observation-log", type=Path, default=None,
                         help="Path for manual observation JSONL log (saved at session end)")
     parser.add_argument("--deck-ids", nargs="*", type=int, default=None,
@@ -57,7 +58,7 @@ def main() -> None:
         manual_mode=args.manual,
         opponent_controls_island=not args.no_opponent_island,
         policy_config_path=args.policy_config,
-        adjustment_log_path=args.adjustment_log or Path("logs/policy_adjustments.jsonl"),
+        adjustment_log_path=args.adjustment_log or DEFAULT_ADJUSTMENT_LOG,
         manual_observation_log_path=args.manual_observation_log or DEFAULT_OBSERVATION_LOG,
     )
 

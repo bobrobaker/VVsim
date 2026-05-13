@@ -212,101 +212,89 @@ def score_action_with_reasons(
     action: Action,
     cfg: dict,
 ) -> tuple[float, list[str]]:
+    features = extract_features(state, action)
+    weights = feature_weights_from_config(cfg)
+    return score_features(features, weights)
+
+
+def extract_features(state: GameState, action: Action) -> dict[str, float]:
+    """Return the active sparse policy features for a legal action."""
     from .cards import get_card
 
+    features: dict[str, float] = {}
     s_card = action.source_card
     cd = get_card(s_card) if s_card else None
-    cs = cfg["cast_spell"]
 
     # ── Instant win ───────────────────────────────────────────────────────────
     if action.action_type == CAST_SPELL and s_card in EXTRA_TURN_WIN_CARDS:
-        return cs["instant_win"], ["instant_win"]
+        _add_feature(features, "guardrail.extra_turn_win")
+        return features
 
     # ── Cast spell ────────────────────────────────────────────────────────────
     if action.action_type == CAST_SPELL:
         if cd is None:
-            return cs["unknown_card"], ["unknown_card"]
+            _add_feature(features, "card.unknown")
+            return features
 
         if cd.is_creature:
-            pen, pen_lbl = _risk_penalty_with_reason(action.risk_level, cfg)
-            reasons = ["creature"]
-            if pen_lbl:
-                reasons.append(pen_lbl)
-            return cs["creature"] + pen, reasons
+            _add_feature(features, "card.creature")
+            _add_risk_feature(features, action.risk_level)
+            return features
 
         if not cd.is_noncreature_spell:
-            return cs["not_noncreature"], ["not_noncreature"]
+            _add_feature(features, "card.not_noncreature")
+            return features
 
-        score = cs["noncreature_base"]
-        reasons: list[str] = ["noncreature_base"]
+        _add_feature(features, "card.noncreature")
 
         effective_cost = action.costs.mana.total_mana
         if effective_cost == 0:
-            score += cs["free_cost_bonus"]
-            reasons.append("free_cost")
+            _add_feature(features, "cost.free")
         elif effective_cost == 1:
-            score += cs["cost_1_bonus"]
-            reasons.append("cost_1")
+            _add_feature(features, "cost.mana_value.1")
         elif effective_cost == 2:
-            score += cs["cost_2_bonus"]
-            reasons.append("cost_2")
+            _add_feature(features, "cost.mana_value.2")
         elif effective_cost <= 3:
-            score += cs["cost_3_bonus"]
-            reasons.append("cost_3")
+            _add_feature(features, "cost.mana_value.3")
 
         if s_card in _MANA_RITUALS:
-            score += cs["mana_ritual_bonus"]
-            reasons.append("mana_ritual")
+            _add_feature(features, "card.mana_ritual_legacy")
 
         if effective_cost == 0 and s_card in _FREE_MANA_SOURCES:
-            score += cs["free_mana_source_bonus"]
-            reasons.append("free_mana_source")
+            _add_feature(features, "card.free_mana_source_legacy")
 
         if _is_tutor(s_card):
-            score += cs["tutor_bonus"]
-            reasons.append("tutor")
+            _add_feature(features, "card.tutor_legacy")
 
         if s_card in ("Gitaxian Probe", "Twisted Image", "Repeal"):
-            score += cs["draw_spell_bonus"]
-            reasons.append("draw_spell")
+            _add_feature(features, "card.draw_spell_legacy")
 
         if action.target and action.requires_target:
             obj = state.get_stack_object(action.target)
             if obj:
-                score += cs["own_stack_target_bonus"]
-                reasons.append("own_stack_target")
+                _add_feature(features, "target.stack_object")
             else:
                 target_perm = state.get_perm_by_id(action.target)
                 if target_perm is not None:
                     if target_perm.card_name.startswith("_opponent"):
-                        score += cs["opponent_dummy_target_bonus"]
-                        reasons.append("opponent_dummy_target")
+                        _add_feature(features, "target.opponent_dummy")
                     elif target_perm.card_name == "Vivi Ornitier":
-                        score += cs["vivi_target_penalty"]
-                        reasons.append("vivi_target")
+                        _add_feature(features, "target.vivi")
 
         if action.alt_cost_type in ("pay_life", "commander_free", "delayed_upkeep"):
-            score += cs["free_alt_cost_bonus"]
-            reasons.append("free_alt_cost")
+            _add_feature(features, f"alt.{action.alt_cost_type}")
 
         # Pitching a card exiles it permanently — undo the free_cost_bonus and apply
         # a value-based penalty based on how good the pitched card is.
         if action.alt_cost_type in ("pitch_blue", "pitch_red", "pitch_blue_x"):
             if effective_cost == 0:
-                score -= cs["free_cost_bonus"]
-                reasons.append("pitch_undo_free")
-            pen, pen_lbl = _pitched_card_penalty_with_reason(action.costs.pitched_card, cs)
-            score += pen
-            reasons.append(pen_lbl)
+                _add_feature(features, "pitch.undo_free_cost")
+            _add_pitch_features(features, action.costs.pitched_card)
 
-        pen, pen_lbl = _risk_penalty_with_reason(action.risk_level, cfg)
-        if pen != 0.0:
-            score += pen
-            reasons.append(pen_lbl)
+        _add_risk_feature(features, action.risk_level)
 
         if effective_cost >= 3 and _mana_is_tight(state):
-            score += cs["tight_mana_penalty"]
-            reasons.append("tight_mana")
+            _add_feature(features, "risk.tight_mana")
 
         # Penalise spending our only red mana on spells that don't make mana back,
         # when a win card in hand still needs red to be cast.
@@ -314,107 +302,302 @@ def score_action_with_reasons(
                 and state.floating_mana.R <= action.costs.mana.pip_r
                 and s_card not in _MANA_RITUALS
                 and _any_win_card_needs_red(state)):
-            score += cs["red_spend_penalty"]
-            reasons.append("red_spend_penalty")
+            _add_feature(features, "mana.spend_last_red")
 
         if _should_defer_cast_to_pending_draw(state, action):
-            score += cs["pending_draw_deferral_penalty"]
-            reasons.append("pending_draw_deferral")
+            _add_feature(features, "cast.defer_to_pending_draw")
 
-        return score, reasons
+        return features
 
     # ── Resolve stack object ──────────────────────────────────────────────────
     if action.action_type == RESOLVE_STACK_OBJECT:
-        rc = cfg["resolve"]
         obj = state.get_stack_object(action.target or "")
         if obj is None:
-            return rc["no_target_fallback"], ["no_target"]
+            _add_feature(features, "resolve.no_target_fallback")
+            return features
 
         if obj.is_draw_trigger:
             if _led_crack_is_better(state):
-                return rc["draw_trigger_led_preempt"], ["led_preempt"]
-            return rc["draw_trigger"], ["draw_trigger"]
+                _add_feature(features, "resolve.draw_trigger_led_preempt")
+                return features
+            _add_feature(features, "resolve.draw_trigger")
+            return features
 
         if _will_produce_mana(obj.card_name):
             if _should_prioritize_mana_producer_resolution(state, obj.card_name):
-                return rc["mana_producer_priority"], ["mana_producer_priority"]
-            return rc["mana_producer"], ["mana_producer"]
+                _add_feature(features, "resolve.mana_producer_priority")
+                return features
+            _add_feature(features, "resolve.mana_producer_legacy")
+            return features
 
         if _is_engine_card(obj.card_name):
-            return rc["engine_card"], ["engine_card"]
+            _add_feature(features, "resolve.engine_card_legacy")
+            return features
 
-        return rc["default"], ["resolve_default"]
+        _add_feature(features, "resolve.default")
+        return features
 
     # ── Mana actions ──────────────────────────────────────────────────────────
     if action.action_type in (ACTIVATE_MANA_ABILITY, SACRIFICE_FOR_MANA):
-        mc = cfg["mana"]
         if (action.action_type == SACRIFICE_FOR_MANA
                 and action.source_card == "Lion's Eye Diamond"
                 and state.pending_curiosity_draws > 0
                 and len(state.hand) <= 1):
-            return mc["led_crack_with_draws"], ["led_crack"]
+            _add_feature(features, "mana.led_crack_with_draws")
+            return features
 
         if _mana_enables_win_cast(state, action):
-            score = mc["enables_win_cast"]
-            reasons = ["mana_enables_win"]
+            _add_feature(features, "mana.enables_win_cast")
         elif _mana_enables_new_cast(state, action):
-            score = mc["enables_new_cast"]
-            reasons = ["mana_enables_cast"]
+            _add_feature(features, "mana.enables_new_cast")
         elif action.risk_level == RISK_SAFE:
-            score = mc["risk_safe"]
-            reasons = ["risk_safe"]
+            _add_feature(features, "mana.risk_safe")
         else:
-            score = mc["default"]
-            reasons = ["mana_default"]
+            _add_feature(features, "mana.default")
 
-        score, reasons = _apply_mana_color_bonuses(score, reasons, state, action, mc)
-        return score, reasons
+        _add_mana_color_features(features, state, action)
+        return features
 
     if action.action_type == EXILE_FOR_MANA:
-        mc = cfg["mana"]
         if _mana_enables_win_cast(state, action):
-            score = mc["exile_enables_win_cast"]
-            reasons = ["exile_enables_win"]
+            _add_feature(features, "mana.exile_enables_win_cast")
         elif _mana_enables_new_cast(state, action):
-            score = mc["exile_enables_new_cast"]
-            reasons = ["exile_enables_cast"]
+            _add_feature(features, "mana.exile_enables_new_cast")
         else:
-            score = mc["exile_default"]
-            reasons = ["exile_default"]
+            _add_feature(features, "mana.exile_default")
 
-        score, reasons = _apply_mana_color_bonuses(score, reasons, state, action, mc)
-        return score, reasons
+        _add_mana_color_features(features, state, action)
+        return features
 
     # ── Land play ─────────────────────────────────────────────────────────────
     if action.action_type == PLAY_LAND:
-        lc = cfg["land"]
         if _land_enables_new_cast(state, action):
-            return lc["enables_new_cast"], ["land_enables_cast"]
-        return lc["default"], ["land_default"]
+            _add_feature(features, "land.enables_new_cast")
+            return features
+        _add_feature(features, "land.default")
+        return features
 
     # ── Pending choice actions ────────────────────────────────────────────────
     if action.action_type == CHOOSE_IMPRINT:
-        return _score_imprint(state, action, cfg), ["imprint"]
+        _add_imprint_features(features, state, action)
+        return features
 
     if action.action_type == CHOOSE_DISCARD:
-        return _score_discard(state, action, cfg), ["discard"]
+        _add_discard_features(features, state, action)
+        return features
 
     if action.action_type == CHOOSE_TUTOR:
-        return _score_tutor(state, action, cfg), ["tutor_choice"]
+        _add_tutor_features(features, action)
+        return features
 
-    return 0.0, ["unknown"]
+    _add_feature(features, "action.unknown")
+    return features
 
 
-def _risk_penalty_with_reason(risk: str, cfg: dict) -> tuple[float, str]:
-    rc = cfg["risk"]
-    mapping = {
-        RISK_SAFE:      (rc.get("safe",      0.0),   ""),
-        RISK_NORMAL:    (rc.get("normal",    0.0),   ""),
-        RISK_EXPENSIVE: (rc.get("expensive", -15.0), "risk_expensive"),
-        RISK_RISKY:     (rc.get("risky",     -35.0), "risk_risky"),
-        RISK_DESPERATE: (rc.get("desperate", -70.0), "risk_desperate"),
+def feature_weights_from_config(cfg: dict) -> dict[str, float]:
+    """Adapt the existing sectioned policy config to flat sparse feature weights."""
+    cs = cfg["cast_spell"]
+    rc = cfg["resolve"]
+    mc = cfg["mana"]
+    lc = cfg["land"]
+    risk = cfg["risk"]
+    return {
+        "guardrail.extra_turn_win": cs["instant_win"],
+        "card.unknown": cs["unknown_card"],
+        "card.creature": cs["creature"],
+        "card.not_noncreature": cs["not_noncreature"],
+        "card.noncreature": cs["noncreature_base"],
+        "cost.free": cs["free_cost_bonus"],
+        "cost.mana_value.1": cs["cost_1_bonus"],
+        "cost.mana_value.2": cs["cost_2_bonus"],
+        "cost.mana_value.3": cs["cost_3_bonus"],
+        "card.mana_ritual_legacy": cs["mana_ritual_bonus"],
+        "card.free_mana_source_legacy": cs["free_mana_source_bonus"],
+        "card.tutor_legacy": cs["tutor_bonus"],
+        "card.draw_spell_legacy": cs["draw_spell_bonus"],
+        "target.stack_object": cs["own_stack_target_bonus"],
+        "target.opponent_dummy": cs["opponent_dummy_target_bonus"],
+        "target.vivi": cs["vivi_target_penalty"],
+        "alt.pay_life": cs["free_alt_cost_bonus"],
+        "alt.commander_free": cs["free_alt_cost_bonus"],
+        "alt.delayed_upkeep": cs["free_alt_cost_bonus"],
+        "pitch.undo_free_cost": -cs["free_cost_bonus"],
+        "pitch.card": cs["pitch_base_penalty"],
+        "pitch.priority_card": cs["pitch_priority_extra"],
+        "pitch.win_card": cs["pitch_win_card_penalty"],
+        "risk.expensive": risk.get("expensive", -15.0),
+        "risk.risky": risk.get("risky", -35.0),
+        "risk.desperate": risk.get("desperate", -70.0),
+        "risk.tight_mana": cs["tight_mana_penalty"],
+        "mana.spend_last_red": cs["red_spend_penalty"],
+        "cast.defer_to_pending_draw": cs["pending_draw_deferral_penalty"],
+        "resolve.no_target_fallback": rc["no_target_fallback"],
+        "resolve.draw_trigger": rc["draw_trigger"],
+        "resolve.draw_trigger_led_preempt": rc["draw_trigger_led_preempt"],
+        "resolve.mana_producer_priority": rc["mana_producer_priority"],
+        "resolve.mana_producer_legacy": rc["mana_producer"],
+        "resolve.engine_card_legacy": rc["engine_card"],
+        "resolve.default": rc["default"],
+        "mana.led_crack_with_draws": mc["led_crack_with_draws"],
+        "mana.enables_win_cast": mc["enables_win_cast"],
+        "mana.enables_new_cast": mc["enables_new_cast"],
+        "mana.risk_safe": mc["risk_safe"],
+        "mana.default": mc["default"],
+        "mana.exile_enables_win_cast": mc["exile_enables_win_cast"],
+        "mana.exile_enables_new_cast": mc["exile_enables_new_cast"],
+        "mana.exile_default": mc["exile_default"],
+        "mana.produces_red_for_win": mc["red_for_win_bonus"],
+        "mana.produces_red": mc["red_mana_bonus"],
+        "mana.reserve_r": mc["reserve_r_bonus"],
+        "mana.reserve_u": mc["reserve_u_bonus"],
+        "land.enables_new_cast": lc["enables_new_cast"],
+        "land.default": lc["default"],
+        "choice.fixed_score": 1.0,
+        "choice.imprint": cfg["imprint"]["baseline"],
+        "choice.imprint.color_needed": cfg["imprint"]["color_needed_bonus"],
+        "choice.imprint.mv": -cfg["imprint"]["mv_penalty_per_pip"],
+        "choice.imprint.priority_penalty_legacy": 1.0,
+        "choice.discard": cfg["discard"]["baseline"],
+        "choice.discard.enters_tapped": cfg["discard"]["enters_tapped_bonus"],
+        "choice.discard.basic_land": cfg["discard"]["basic_land_bonus"],
+        "choice.discard.excess_color": cfg["discard"]["excess_color_bonus"],
+        "choice.tutor": cfg["tutor"]["top_score"],
+        "choice.tutor.step": -cfg["tutor"]["step_penalty"],
+        "choice.tutor.unlisted": cfg["tutor"]["unlisted_score"],
     }
-    return mapping.get(risk, (0.0, ""))
+
+
+def score_features(features: dict[str, float], weights: dict[str, float]) -> tuple[float, list[str]]:
+    """Score active sparse features and return nonzero contribution names."""
+    score = 0.0
+    reasons: list[str] = []
+    for name, value in features.items():
+        weight = weights.get(name, 0.0)
+        contribution = value * weight
+        if contribution != 0.0:
+            score += contribution
+            reasons.append(name)
+    return score, reasons
+
+
+def _add_feature(features: dict[str, float], name: str, value: float = 1.0) -> None:
+    if value != 0.0:
+        features[name] = features.get(name, 0.0) + value
+
+
+def _add_risk_feature(features: dict[str, float], risk: str) -> None:
+    mapping = {
+        RISK_EXPENSIVE: "risk.expensive",
+        RISK_RISKY: "risk.risky",
+        RISK_DESPERATE: "risk.desperate",
+    }
+    feature = mapping.get(risk)
+    if feature:
+        _add_feature(features, feature)
+
+
+def _add_pitch_features(features: dict[str, float], card_name: str | None) -> None:
+    if card_name in EXTRA_TURN_WIN_CARDS:
+        _add_feature(features, "pitch.win_card")
+        return
+    _add_feature(features, "pitch.card")
+    if card_name is not None:
+        try:
+            idx = _TUTOR_PRIORITY.index(card_name)
+        except ValueError:
+            return
+        frac = 1.0 - idx / max(len(_TUTOR_PRIORITY), 1)
+        _add_feature(features, "pitch.priority_card", frac)
+
+
+def _add_mana_color_features(features: dict[str, float], state: GameState, action: Action) -> None:
+    gained = action.effects.add_mana
+    produces_red = gained.R > 0
+    produces_any = gained.ANY > 0
+    produces_blue = gained.U > 0
+
+    if _any_win_card_needs_red(state) and (produces_red or produces_any):
+        _add_feature(features, "mana.produces_red_for_win")
+    elif produces_red:
+        _add_feature(features, "mana.produces_red")
+
+    # Reserve bonuses: reaching 1R (more valuable) or 1U from zero
+    if produces_red and state.floating_mana.R == 0:
+        _add_feature(features, "mana.reserve_r")
+    elif (produces_blue or produces_any) and state.floating_mana.U == 0:
+        _add_feature(features, "mana.reserve_u")
+
+
+def _add_imprint_features(features: dict[str, float], state: GameState, action: Action) -> None:
+    """Emit CHOOSE_IMPRINT features matching the legacy score shape."""
+    from .cards import get_card
+
+    card = action.source_card
+    if card is None:
+        _add_feature(features, "choice.fixed_score", 1.0)
+        return
+
+    cd = get_card(card)
+    if cd is None:
+        _add_feature(features, "choice.fixed_score", 10.0)
+        return
+
+    _add_feature(features, "choice.imprint")
+
+    priority_idx = next((i for i, c in enumerate(_TUTOR_PRIORITY) if c == card), None)
+    if priority_idx is not None:
+        _add_feature(features, "choice.imprint.priority_penalty_legacy", -max(5.0, 40.0 - priority_idx * 2.0))
+
+    color = "U" if cd.has_blue else "R"
+    need_u = sum(1 for c in state.hand if (c2 := get_card(c)) and c2 and c2.pip_u > 0)
+    need_r = sum(1 for c in state.hand if (c2 := get_card(c)) and c2 and c2.pip_r > 0)
+    if color == "U" and need_u > state.floating_mana.U:
+        _add_feature(features, "choice.imprint.color_needed")
+    if color == "R" and need_r > state.floating_mana.R:
+        _add_feature(features, "choice.imprint.color_needed")
+
+    _add_feature(features, "choice.imprint.mv", cd.mv)
+
+
+def _add_discard_features(features: dict[str, float], state: GameState, action: Action) -> None:
+    """Emit CHOOSE_DISCARD features matching the legacy score shape."""
+    from .cards import get_card
+
+    land = action.source_card
+    if land is None:
+        _add_feature(features, "choice.fixed_score", 1.0)
+        return
+
+    cd = get_card(land)
+    if cd is None:
+        _add_feature(features, "choice.fixed_score", 20.0)
+        return
+
+    _add_feature(features, "choice.discard")
+    if cd.land_enters_tapped == "true":
+        _add_feature(features, "choice.discard.enters_tapped")
+    if "Basic" in cd.card_types:
+        _add_feature(features, "choice.discard.basic_land")
+
+    colors = cd.mana_colors or ""
+    if "U" in colors and state.floating_mana.U >= 2:
+        _add_feature(features, "choice.discard.excess_color")
+    if "R" in colors and state.floating_mana.R >= 2:
+        _add_feature(features, "choice.discard.excess_color")
+
+
+def _add_tutor_features(features: dict[str, float], action: Action) -> None:
+    """Emit CHOOSE_TUTOR features matching the legacy priority score."""
+    card = action.source_card
+    if card is None:
+        return
+    try:
+        idx = _TUTOR_PRIORITY.index(card)
+    except ValueError:
+        _add_feature(features, "choice.tutor.unlisted")
+        return
+    _add_feature(features, "choice.tutor")
+    _add_feature(features, "choice.tutor.step", idx)
 
 
 def _is_engine_card(card_name: str | None) -> bool:
@@ -528,53 +711,6 @@ def _mana_enables_win_cast(state: GameState, mana_action: Action) -> bool:
     return False
 
 
-def _apply_mana_color_bonuses(
-    score: float,
-    reasons: list[str],
-    state: GameState,
-    action: Action,
-    mc: dict,
-) -> tuple[float, list[str]]:
-    """Add red-preference and reserve bonuses to a mana action score."""
-    gained = action.effects.add_mana
-    produces_red = gained.R > 0
-    produces_any = gained.ANY > 0
-    produces_blue = gained.U > 0
-
-    if _any_win_card_needs_red(state) and (produces_red or produces_any):
-        score += mc["red_for_win_bonus"]
-        reasons = reasons + ["red_for_win"]
-    elif produces_red:
-        score += mc["red_mana_bonus"]
-        reasons = reasons + ["red_mana"]
-
-    # Reserve bonuses: reaching 1R (more valuable) or 1U from zero
-    if produces_red and state.floating_mana.R == 0:
-        score += mc["reserve_r_bonus"]
-        reasons = reasons + ["reserve_r"]
-    elif (produces_blue or produces_any) and state.floating_mana.U == 0:
-        score += mc["reserve_u_bonus"]
-        reasons = reasons + ["reserve_u"]
-
-    return score, reasons
-
-
-def _pitched_card_penalty_with_reason(card_name: str | None, cs: dict) -> tuple[float, str]:
-    """Penalty for exiling a card via pitch cost; higher for more valuable cards."""
-    if card_name in EXTRA_TURN_WIN_CARDS:
-        return cs["pitch_win_card_penalty"], "pitch_win_card"
-    base = cs["pitch_base_penalty"]
-    extra = cs["pitch_priority_extra"]
-    if card_name is not None:
-        try:
-            idx = _TUTOR_PRIORITY.index(card_name)
-            frac = 1.0 - idx / max(len(_TUTOR_PRIORITY), 1)
-            return base + frac * extra, "pitch_priority_card"
-        except ValueError:
-            pass
-    return base, "pitch_card"
-
-
 def _mana_enables_new_cast(state: GameState, mana_action: Action) -> bool:
     """Check if activating this mana source would let us cast something we can't currently."""
     from .mana import ManaPool, can_pay_cost
@@ -608,85 +744,6 @@ _TUTOR_PRIORITY = [
     "Gamble", "Intuition",
     "Force of Will", "Swan Song", "Flusterstorm", "Mental Misstep",
 ]
-
-
-def _score_imprint(state: GameState, action: Action, cfg: dict) -> float:
-    """Score a CHOOSE_IMPRINT action: prefer cheap cards that produce a needed color."""
-    from .cards import get_card
-    ic = cfg["imprint"]
-    card = action.source_card
-    if card is None:
-        return 1.0  # no imprint: Chrome Mox is a dead card
-
-    cd = get_card(card)
-    if cd is None:
-        return 10.0
-
-    score = ic["baseline"]
-
-    # Strongly prefer not to imprint high-priority / win cards
-    priority_idx = next((i for i, c in enumerate(_TUTOR_PRIORITY) if c == card), None)
-    if priority_idx is not None:
-        score -= max(5.0, 40.0 - priority_idx * 2.0)
-
-    # Bonus when the color Chrome Mox would produce is needed
-    color = "U" if cd.has_blue else "R"
-    need_u = sum(1 for c in state.hand if (c2 := get_card(c)) and c2 and c2.pip_u > 0)
-    need_r = sum(1 for c in state.hand if (c2 := get_card(c)) and c2 and c2.pip_r > 0)
-    if color == "U" and need_u > state.floating_mana.U:
-        score += ic["color_needed_bonus"]
-    if color == "R" and need_r > state.floating_mana.R:
-        score += ic["color_needed_bonus"]
-
-    # Prefer imprinting lower-MV cards (less opportunity cost)
-    score -= cd.mv * ic["mv_penalty_per_pip"]
-
-    return score
-
-
-def _score_discard(state: GameState, action: Action, cfg: dict) -> float:
-    """Score a CHOOSE_DISCARD action (Mox Diamond land discard)."""
-    from .cards import get_card
-    dc = cfg["discard"]
-    land = action.source_card
-    if land is None:
-        return 1.0  # sacrificing Mox Diamond is worst case
-
-    cd = get_card(land)
-    if cd is None:
-        return 20.0
-
-    score = dc["baseline"]
-
-    # Prefer to discard tapped or enters-tapped lands (less immediate value)
-    if cd.land_enters_tapped == "true":
-        score += dc["enters_tapped_bonus"]
-
-    # Prefer to discard basic lands over dual lands (basics are replaceable)
-    if "Basic" in cd.card_types:
-        score += dc["basic_land_bonus"]
-
-    # Prefer to discard lands that produce colors we already have plenty of
-    colors = cd.mana_colors or ""
-    if "U" in colors and state.floating_mana.U >= 2:
-        score += dc["excess_color_bonus"]
-    if "R" in colors and state.floating_mana.R >= 2:
-        score += dc["excess_color_bonus"]
-
-    return score
-
-
-def _score_tutor(state: GameState, action: Action, cfg: dict) -> float:
-    """Score a CHOOSE_TUTOR action by priority list position."""
-    tc = cfg["tutor"]
-    card = action.source_card
-    if card is None:
-        return 0.0
-    try:
-        idx = _TUTOR_PRIORITY.index(card)
-        return tc["top_score"] - idx * tc["step_penalty"]
-    except ValueError:
-        return tc["unlisted_score"]  # unlisted cards get a mid-range score
 
 
 def _land_enables_new_cast(state: GameState, land_action: Action) -> bool:

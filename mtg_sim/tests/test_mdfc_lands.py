@@ -1,4 +1,4 @@
-"""Tests for MDFC Lands bucket (lines 103–146 of docs/card_specifics.md)."""
+"""Tests for MDFC Lands bucket (lines 103-146 of docs/specs/card_specifics.md)."""
 import pytest
 from pathlib import Path
 from mtg_sim.sim.cards import load_card_library

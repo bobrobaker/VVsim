@@ -13,8 +13,9 @@ from mtg_sim.sim.actions import (
 )
 from mtg_sim.sim.stack import StackObject
 from mtg_sim.sim.policies import (
-    load_policy_config, rank_actions, score_action,
+    load_policy_config, rank_actions, choose_action, score_action,
     score_action_with_reasons, ScoredAction, _DEFAULTS,
+    extract_features, feature_weights_from_config, score_features,
 )
 
 
@@ -104,7 +105,40 @@ def test_score_action_with_toml_override(tmp_path):
     action = _cast("Gitaxian Probe")
     score, reasons = score_action_with_reasons(state, action, cfg)
     assert score == pytest.approx(500.0)  # base only (cost and draw bonuses zeroed)
-    assert "noncreature_base" in reasons
+    assert "card.noncreature" in reasons
+
+
+def test_extract_features_for_free_draw_spell():
+    _load_lib()
+    state = _state(floating_mana=ManaPool(U=1))
+    action = _cast("Gitaxian Probe")
+
+    features = extract_features(state, action)
+
+    assert features["card.noncreature"] == pytest.approx(1.0)
+    assert features["cost.free"] == pytest.approx(1.0)
+    assert features["card.draw_spell_legacy"] == pytest.approx(1.0)
+
+
+def test_score_features_reports_nonzero_feature_reasons():
+    features = {"a": 1.0, "b": 2.0, "c": 1.0}
+    weights = {"a": 3.0, "b": -2.0, "c": 0.0}
+
+    score, reasons = score_features(features, weights)
+
+    assert score == pytest.approx(-1.0)
+    assert reasons == ["a", "b"]
+
+
+def test_feature_weight_adapter_preserves_existing_config_sections(tmp_path):
+    toml_path = tmp_path / "policy.toml"
+    toml_path.write_text("[cast_spell]\nnoncreature_base = 321.0\n")
+    cfg = load_policy_config(toml_path)
+
+    weights = feature_weights_from_config(cfg)
+
+    assert weights["card.noncreature"] == pytest.approx(321.0)
+    assert weights["cost.free"] == pytest.approx(_DEFAULTS["cast_spell"]["free_cost_bonus"])
 
 
 # ── rank_actions ──────────────────────────────────────────────────────────────
@@ -145,6 +179,36 @@ def test_rank_actions_single_action_is_rank_1(tmp_path):
     ranked = rank_actions(state, [_cast("Gitaxian Probe")], cfg)
     assert ranked[0].rank == 1
     assert ranked[0].delta == pytest.approx(0.0)
+
+
+def test_extra_turn_win_cast_remains_overwhelming_top_ranked():
+    _load_lib()
+    cfg = load_policy_config()
+    state = _state(floating_mana=ManaPool(U=1, R=2))
+
+    final_fortune = _cast("Final Fortune", mana_r=2)
+    probe = _cast("Gitaxian Probe")
+
+    ranked = rank_actions(state, [probe, final_fortune], cfg)
+
+    assert ranked[0].action is final_fortune
+    assert ranked[0].score == pytest.approx(cfg["cast_spell"]["instant_win"])
+    assert ranked[0].score > ranked[1].score
+    assert ranked[0].reasons == ["guardrail.extra_turn_win"]
+
+
+def test_choose_action_returns_none_when_best_score_non_positive(tmp_path):
+    _load_lib()
+    cfg = load_policy_config(tmp_path / "nofile.toml")
+    cfg["cast_spell"]["noncreature_base"] = 0.0
+    cfg["cast_spell"]["free_cost_bonus"] = 0.0
+    cfg["cast_spell"]["draw_spell_bonus"] = 0.0
+
+    state = _state()
+    action = _cast("Gitaxian Probe")
+
+    assert score_action(state, action, cfg) == pytest.approx(0.0)
+    assert choose_action(state, [action], cfg) is None
 
 
 def test_rank_actions_reasons_nonempty():
@@ -189,8 +253,8 @@ def test_permanent_target_policy_prefers_dummy_over_vivi():
     dummy_score, dummy_reasons = score_action_with_reasons(state, target_dummy, cfg)
 
     assert dummy_score > vivi_score
-    assert "opponent_dummy_target" in dummy_reasons
-    assert "vivi_target" in vivi_reasons
+    assert "target.opponent_dummy" in dummy_reasons
+    assert "target.vivi" in vivi_reasons
 
 
 def test_chain_of_vapor_policy_ranks_dummy_target_above_vivi():
@@ -236,7 +300,7 @@ def test_draw_trigger_ranks_above_one_mana_non_win_cast():
     ranked = rank_actions(state, [cast_spell, resolve_draw], cfg)
     assert ranked[0].action is resolve_draw
     assert ranked[0].score > ranked[1].score
-    assert "draw_trigger" in ranked[0].reasons
+    assert "resolve.draw_trigger" in ranked[0].reasons
 
 
 def test_mana_producer_resolve_ranks_above_paid_cast():
@@ -258,7 +322,7 @@ def test_mana_producer_resolve_ranks_above_paid_cast():
     ranked = rank_actions(state, [paid_cast, resolve_rite], cfg)
     assert ranked[0].action is resolve_rite
     assert ranked[0].score > ranked[1].score
-    assert "mana_producer_priority" in ranked[0].reasons
+    assert "resolve.mana_producer_priority" in ranked[0].reasons
 
 
 def test_truly_free_cast_can_rank_above_mana_producer_resolve():
@@ -280,8 +344,8 @@ def test_truly_free_cast_can_rank_above_mana_producer_resolve():
 
     ranked = rank_actions(state, [resolve_rite, probe], cfg)
     assert ranked[0].action is probe
-    assert "free_cost" in ranked[0].reasons
-    assert "free_alt_cost" in ranked[0].reasons
+    assert "cost.free" in ranked[0].reasons
+    assert "alt.pay_life" in ranked[0].reasons
 
 
 def test_mana_producer_resolve_ranks_above_mana_activation():
@@ -364,7 +428,7 @@ def test_pitch_reasons_include_penalty_label():
     state = _state()
     action = _pitch_cast("Force of Will", "Brainstorm")
     _, reasons = score_action_with_reasons(state, action, cfg)
-    assert "pitch_undo_free" in reasons
+    assert "pitch.undo_free_cost" in reasons
     assert any("pitch" in r for r in reasons)
 
 
@@ -396,7 +460,7 @@ def test_free_mana_source_reason_present():
     cfg = load_policy_config()
     state = _state()
     _, reasons = score_action_with_reasons(state, _cast("Lotus Petal"), cfg)
-    assert "free_mana_source" in reasons
+    assert "card.free_mana_source_legacy" in reasons
 
 
 # ── Mana enables win cast ─────────────────────────────────────────────────────
@@ -424,7 +488,7 @@ def test_mana_enabling_win_cast_scores_above_enables_new_cast():
     action = _mana_action(ManaPool(R=1))
     score, reasons = score_action_with_reasons(state, action, cfg)
     assert score >= cfg["mana"]["enables_win_cast"]
-    assert "mana_enables_win" in reasons
+    assert "mana.enables_win_cast" in reasons
 
 
 def test_mana_enables_win_cast_higher_than_regular_cast_enable():
@@ -466,7 +530,7 @@ def test_red_for_win_bonus_applies_when_win_card_needs_red():
     action = _mana_action(ManaPool(ANY=2), source="Sol Ring")
     _, reasons = score_action_with_reasons(state, action, cfg)
     # Either enables_win or red_for_win should trigger
-    assert "mana_enables_win" in reasons or "red_for_win" in reasons
+    assert "mana.enables_win_cast" in reasons or "mana.produces_red_for_win" in reasons
 
 
 # ── Red spend penalty ─────────────────────────────────────────────────────────
@@ -483,7 +547,7 @@ def test_red_spend_penalty_when_win_card_needs_red():
     # Rite of Flame costs R but IS a mana ritual — no penalty
     rite = _cast("Rite of Flame", mana_r=1)
     rite_score, rite_reasons = score_action_with_reasons(state, rite, cfg)
-    assert "red_spend_penalty" not in rite_reasons
+    assert "mana.spend_last_red" not in rite_reasons
 
     # Scoring a non-ritual that costs R should include penalty
     # Use a generic action with pip_r=1 cost via ManaCost
@@ -496,4 +560,4 @@ def test_red_spend_penalty_when_win_card_needs_red():
         risk_level=RISK_NORMAL,
     )
     _, reasons = score_action_with_reasons(state, non_ritual, cfg)
-    assert "red_spend_penalty" in reasons
+    assert "mana.spend_last_red" in reasons

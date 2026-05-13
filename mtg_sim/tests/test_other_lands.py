@@ -1,4 +1,4 @@
-"""Tests for Other Lands bucket (lines 147–224 of docs/card_specifics.md)."""
+"""Tests for Other Lands bucket (lines 147-224 of docs/specs/card_specifics.md)."""
 import pytest
 from pathlib import Path
 from mtg_sim.sim.cards import load_card_library

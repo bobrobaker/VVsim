@@ -2,6 +2,7 @@
 - `_build_initial_state` always enters Volcanic Island tapped; tests asserting mana or tapped state must account for this.
 - `manual_mode` flag lives on `RunConfig`, not `GameState`; display logic is in `_manual_choose_action`, not the main loop.
 - `cfg` is loaded once per `simulate_run` call via `load_policy_config`; changing the TOML mid-run has no effect.
+- `_check_win` owns global run-level wins like noncreature spell count; card-specific wins are delegated to `CardBehavior.check_win`.
 
 ## Touchpoints
 - `RunConfig` dataclass: 28; `RunResult` dataclass: 52
@@ -11,6 +12,7 @@
 - `_build_initial_state`: 331
 
 ## Recent changes
+- 2026-05-11: `_check_win` now delegates stack/battlefield card win predicates to registered card behaviors.
 - 2026-05-07: `_manual_choose_action` now calls `rank_actions`, shows scores/delta/reasons, prompts for reason on non-top choice, writes JSONL via `_write_adjustment_log`. `RunConfig` gained `policy_config_path` and `adjustment_log_path`.
 - 2026-05-07: Added `Exile:` display block to `_manual_choose_action`; printed only when nonempty.
 - 2026-05-09: Manual-mode JSONL entries include shared `run_id`/`session_id`; manual observation ranked actions and policy-adjustment `all_scored` entries serialize action `costs`/`effects`.

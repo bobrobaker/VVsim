@@ -7,4 +7,10 @@ dist/
 build/
 .venv/
 *.Zone.Identifier
+*:Zone.Identifier
 .DS_Store
+
+# Agent volatile files (worktrees and locks are transient; artifacts preserved by default)
+.agents/worktrees/
+.agents/locks/*.lock
+.agents/locks/*.status

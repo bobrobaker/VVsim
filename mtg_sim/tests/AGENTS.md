@@ -16,7 +16,7 @@ Scope: tests under `mtg_sim/tests/`.
 - Assert exact state transitions when relevant: hand, library, graveyard, exile, battlefield, stack, floating mana, pending choices, permissions, counters, tapped state, and sacrificed state.
 - For legality, assert both legal actions present and illegal actions absent.
 - Include negative tests for illegal targets, missing resources, wrong timing, absent board state, and exhausted one-shot resources.
-- Test the modeled behavior in `docs/card_specifics.md`, not full real Magic card text.
+- Test the modeled behavior in `docs/specs/card_specifics.md`, not full real Magic card text.
 
 ## Fixtures And Helpers
 

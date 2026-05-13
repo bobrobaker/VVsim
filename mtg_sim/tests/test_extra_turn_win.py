@@ -6,7 +6,8 @@ DATA_DIR = Path(__file__).parent.parent.parent
 
 from mtg_sim.sim.cards import load_card_library, build_active_deck
 from mtg_sim.sim.mana import ManaPool
-from mtg_sim.sim.runner import RunConfig, simulate_run, _is_hullbreaker_eligible, _check_win
+from mtg_sim.sim.runner import RunConfig, simulate_run, _check_win
+from mtg_sim.sim.card_behaviors import _is_hullbreaker_eligible
 from mtg_sim.sim.state import GameState, Permanent
 from mtg_sim.sim.stack import StackObject
 from mtg_sim.sim.action_generator import generate_actions

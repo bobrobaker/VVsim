@@ -4,6 +4,7 @@ Each CardBehavior subclass handles:
   generate_actions  – what actions this card enables (mana, cast-from-exile, etc.)
   resolve_cast      – what happens when this card resolves from the stack
   on_enter          – called when a permanent enters the battlefield
+  check_win         – card-owned state predicates that end the run
 """
 from __future__ import annotations
 from typing import TYPE_CHECKING
@@ -12,6 +13,7 @@ from .actions import (
     Action, CostBundle, EffectBundle,
     CAST_SPELL, ACTIVATE_MANA_ABILITY, EXILE_FOR_MANA, SACRIFICE_FOR_MANA, FETCH_LAND,
     ACTIVATE_TRANSMUTE,
+    WIN_EXTRA_TURN,
     RISK_SAFE, RISK_NORMAL, RISK_EXPENSIVE, RISK_RISKY, RISK_DESPERATE,
     EXTRA_TURN_WIN_CARDS,
 )
@@ -45,6 +47,9 @@ class CardBehavior:
 
     def on_enter(self, state: GameState, perm: Permanent) -> None:
         pass
+
+    def check_win(self, state: GameState, card_name: str) -> tuple[str, str]:
+        return "", ""
 
 
 # ── Mana: simple tap artifacts ────────────────────────────────────────────────
@@ -813,6 +818,59 @@ class OphidianEyeBehavior(CardBehavior):
 class NullBehavior(CardBehavior):
     """For spells that just resolve with no modeled effect."""
     pass
+
+
+class ExtraTurnWinBehavior(CardBehavior):
+    """Terminator spells: once cast and on the stack, the run is considered won."""
+
+    def check_win(self, state, card_name):
+        if any(obj.card_name == card_name for obj in state.stack):
+            return WIN_EXTRA_TURN, card_name
+        return "", ""
+
+
+class QuicksilverElementalBehavior(CardBehavior):
+    """Activated ability details not modeled; {U} available means deterministic win."""
+
+    def check_win(self, state, card_name):
+        if any(p.card_name == card_name for p in state.battlefield) and state.floating_mana.U >= 1:
+            return WIN_EXTRA_TURN, card_name
+        return "", ""
+
+
+class HullbreakerHorrorBehavior(CardBehavior):
+    """Can win the game in slightly more flexible circumstances."""
+
+    def check_win(self, state, card_name):
+        if not state.stack:
+            return "", ""
+        if not any(p.card_name == card_name for p in state.battlefield):
+            return "", ""
+        eligible = sum(1 for p in state.battlefield if _is_hullbreaker_eligible(p.card_name))
+        if eligible >= 2:
+            return WIN_EXTRA_TURN, card_name
+        return "", ""
+
+
+def _is_hullbreaker_eligible(card_name: str) -> bool:
+    """Nonland, nontoken, reusable, non-sacrifice mana source that is mana-neutral-or-better."""
+    from .cards import get_card
+
+    cd = get_card(card_name)
+    if cd is None:
+        return False
+    if cd.is_land:
+        return False
+    if not cd.produces_mana:
+        return False
+    if cd.requires_sacrifice:
+        return False
+    if cd.mana_timing not in ("repeatable", "conditional"):
+        return False
+    try:
+        return int(cd.mana_amount) >= cd.mv
+    except (ValueError, TypeError):
+        return False
 
 
 # ── Spell: Snapback ───────────────────────────────────────────────────────────
@@ -2175,6 +2233,12 @@ class VirtueOfCourageBehavior(CardBehavior):
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 CARD_BEHAVIORS: dict[str, CardBehavior] = {
+    "Alchemist's Gambit":   ExtraTurnWinBehavior(),
+    "Final Fortune":        ExtraTurnWinBehavior(),
+    "Last Chance":          ExtraTurnWinBehavior(),
+    "Warrior's Oath":       ExtraTurnWinBehavior(),
+    "Hullbreaker Horror":   HullbreakerHorrorBehavior(),
+    "Quicksilver Elemental": QuicksilverElementalBehavior(),
     "Sol Ring":            SolRingBehavior(),
     "Mana Vault":          ManaVaultBehavior(),
     "Grim Monolith":       GrimMonolithBehavior(),

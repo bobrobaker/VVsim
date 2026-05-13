@@ -1,0 +1,17 @@
+# Agent orchestration config for Route B (Claude → Codex sync flow)
+
+[codex]
+enabled = true
+mode = "sync"
+use_worktree = true
+
+[review]
+codex_result_review = "always"  # "always" | "claude_decides" (future)
+
+[patch]
+base_commit_policy = "warn"  # "warn" | "require" | "ignore"
+
+[cleanup]
+auto_cleanup_after_success = false
+preserve_artifacts = true
+# Preserved by default: result JSON, diff, patch, event log, run metadata

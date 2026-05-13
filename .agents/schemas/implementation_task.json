@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "implementation_task",
+  "title": "ImplementationTask",
+  "description": "A bounded implementation task created by Claude and executed by Codex in a temporary worktree.",
+  "type": "object",
+  "required": ["task_id", "base_commit", "title", "description", "acceptance_criteria"],
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique identifier for this task (e.g. 'task-20260513-001')."
+    },
+    "base_commit": {
+      "type": "string",
+      "description": "Full git commit SHA the worktree is based on. Used by patch application policy."
+    },
+    "title": {
+      "type": "string",
+      "description": "Short human-readable task title."
+    },
+    "description": {
+      "type": "string",
+      "description": "Full description of what Codex should implement, including context and constraints."
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of testable criteria that define done."
+    },
+    "files_in_scope": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional list of file paths Codex is expected to touch. Non-exhaustive; for guidance."
+    },
+    "files_off_limits": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional list of file paths Codex must not modify."
+    },
+    "validation_commands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Commands Codex should run to validate its work (e.g. pytest invocations)."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when Claude created the task."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary key/value metadata for future routing, token-budget, or worker-pool extensions.",
+      "additionalProperties": true
+    }
+  }
+}

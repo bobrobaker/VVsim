@@ -9,7 +9,7 @@ Goal: simulate whether a starting state can chain enough spells to "Win"
 All tests: `python3 -m pytest mtg_sim/tests/ -q`
 All tests, suppress known warnings: `python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning`
 One test: `python3 -m pytest mtg_sim/tests/<test_file>.py -v`
-Single trace: `python3 -m mtg_sim.scripts.run_single --mana-u 1 --mana-r 1 --seed 42`
+Single trace: `python3 -m mtg_sim.scripts.run_single --mana-u 1 --mana-r 1 --seed $RANODM`
 Monte Carlo: `python3 -m mtg_sim.scripts.run_monte_carlo --runs 1000 --mana-u 1`
 
 ## Core architecture
@@ -44,7 +44,7 @@ Key files:
 
 - Use grep for symbol, field, registry, constant, and call-site checks before reading code.
 - Read only relevant ranges, but prefer one complete function/class range over multiple partial reads.
-- Do not read a whole file to find a section.
+- Do not read a whole file to find a section. `AGENTS.md` is a grep-first file: it mirrors CLAUDE.md closely, so grep for section headings (`grep -n "^##" AGENTS.md`) before reading any range.
 - Before reading >150 lines, explain why the full range is needed.
 - Separate required reads from conditional reads. Read conditional files only when the change touches that concern.
 - Do not inspect unrelated files.
@@ -54,10 +54,11 @@ Key files:
 - For broad pytest runs, suppress known noisy warnings unless investigating warnings.
 - CompanionDocs: before editing any `mtg_sim/` file, `.claude/rules/sim-notes.md` auto-loads a matching `docs/notes/` file with Touchpoints and Gotchas.
 - Testing rules are in `.claude/rules/tests.md` (auto-loaded for `mtg_sim/tests/**`).
+- When routing a gotcha or touchpoint to a CompanionDoc for a source file outside `mtg_sim/`, also create or update a `.claude/rules/<area>-notes.md` with a `globs:` pattern covering that file's directory, so the CompanionDoc is auto-loaded in future sessions. A gotcha routed only to a CompanionDoc with no triggering rule is effectively invisible.
 
 ## Card-specific implementation direction
 
-See `docs/workstream_card_specific.md` for the full bucket workflow.
+See `docs/workstreams/card_specific.md` for the full bucket workflow.
 
 - Prefer card-specific logic in `card_behaviors.py`.
 - Keep `action_generator.py` as generic scaffolding where practical.
@@ -67,8 +68,8 @@ See `docs/workstream_card_specific.md` for the full bucket workflow.
 - Noncreature spell casts should still trigger Vivi/Curiosity through existing cast logic.
 - Permanent spells should enter battlefield through existing resolver logic unless the card says otherwise.
 - Nonpermanent spells should go to graveyard unless the card says otherwise.
-- Do not model omitted real-card behavior unless `docs/card_specifics.md` says to model it.
-- Add `Comments:` text from `docs/card_specifics.md` as implementation comments when it explains a simulator simplification.
+- Do not model omitted real-card behavior unless `docs/specs/card_specifics.md` says to model it.
+- Add `Comments:` text from `docs/specs/card_specifics.md` as implementation comments when it explains a simulator simplification.
 
 ## For policy work
 
@@ -79,7 +80,7 @@ See `docs/workstream_card_specific.md` for the full bucket workflow.
 
 ## Backlog
 
-When you notice an opportunity to refactor, improve architecture, reduce technical debt, or use a better long-term approach — but it is not needed for the current task — create a task via TaskCreate with status `pending`, subject prefixed `[SUGGESTION]`, and a structured description following `docs/backlog_instructions.md`.
+When you notice an opportunity to refactor, improve architecture, reduce technical debt, or use a better long-term approach — but it is not needed for the current task — create a task via TaskCreate with status `pending`, subject prefixed `[SUGGESTION]`, and a structured description following `docs/backlog/instructions.md`.
 
 Do not create backlog items for low-value style nits. Create an item if value is medium or high, OR if urgency is medium or high (either dimension is sufficient).
 
@@ -92,3 +93,22 @@ Human todos: `docs/todo.md`. Task backlog: via TaskCreate (stored in `~/.claude/
 These constrain current architectural decisions:
 - Policy weights will move to a text-editable config file; keep scoring logic separate from action generation.
 - Card behaviors may eventually split into per-card files; keep each behavior self-contained.
+
+
+## Roadmap routing
+
+Roadmap: `docs/road.md`
+
+Workstream routing: when asked to do a "workstream" or "workflow" task (e.g. "do the next bucket"), list `docs/workstreams/` folder names first (`ls docs/workstreams/`) to find the matching workstream directory, then read `workstream.md` inside it. Do not read `docs/road.md` to find the workstream path.
+
+Read protocol:
+- Planning sessions: read current phase + immediate next work. Implementation sessions: read only the named phase/workstream if needed.
+
+Efficient reading:
+- Find active phase: `grep -n "Ongoing phase" docs/road.md`
+- List phase headings: `grep -n "^### Phase" docs/road.md`
+- Read one phase by heading, not line numbers from old prompts.
+- If anchors exist, prefer:
+  - `ROADMAP:PHASE-N:START`
+  - `ROADMAP:PHASE-N:END`
+- For near-term priorities: read `## 3. Immediate next work`.
