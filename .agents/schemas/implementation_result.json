@@ -30,6 +30,7 @@
       "items": {
         "type": "object",
         "required": ["command", "exit_code"],
+        "additionalProperties": false,
         "properties": {
           "command": { "type": "string" },
           "exit_code": { "type": "integer" },
@@ -49,6 +50,7 @@
       "items": {
         "type": "object",
         "required": ["title", "description"],
+        "additionalProperties": false,
         "properties": {
           "title": { "type": "string" },
           "description": { "type": "string" }
@@ -58,13 +60,7 @@
     },
     "completed_at": {
       "type": "string",
-      "format": "date-time",
       "description": "ISO 8601 timestamp when Codex finished."
-    },
-    "metadata": {
-      "type": "object",
-      "description": "Arbitrary key/value metadata (e.g. token usage, model, run duration).",
-      "additionalProperties": true
     }
   }
 }

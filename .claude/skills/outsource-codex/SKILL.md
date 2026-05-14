@@ -6,7 +6,7 @@ Claude orchestration entry point for the Route B Codex delegation flow.
 
 1. **Create task** — write one `ImplementationTask` entry to `.agents/tasks.json`.
 2. **Run Codex** — call `run_codex_task.py` with `--task-id`; Codex runs in an isolated worktree.
-3. **Inspect result** — read `.agents/runs/<task_id>/<task_id>.result.json` and `.agents/runs/<task_id>/<task_id>.diff`.
+3. **Inspect result** — read `.agents/runs/<safe_task_id>.run.json` (run metadata, includes result and artifact paths) and `.agents/runs/<safe_task_id>.diff`. The result JSON is captured by the harness via `-o`; Codex does not manually write it.
 4. **Apply patch** — call `apply_codex_patch.apply(task_id)` after review; passes policy checks before touching main checkout.
 5. **Cleanup** — call `cleanup_codex_task.cleanup(task_id)` to remove worktree/branch/lock.
 

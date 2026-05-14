@@ -101,7 +101,7 @@ Key files:
 When launched non-interactively by `run_codex_task.py` or with a task artifact, follow bounded-implementer rules in `.agents/skills/codex-implementer/SKILL.md`:
 
 - Implement only what the task describes; report follow-ups in result JSON, do not expand scope.
-- Write an `ImplementationResult` JSON to `.agents/runs/<task_id>/<task_id>.result.json`.
+- Return your final answer as raw JSON matching ImplementationResult. Do not wrap in markdown. Do not manually write the result artifact; `codex exec --output-last-message / -o` captures your final response.
 - Run all `validation_commands` before reporting success.
 - Do not add entries to `.agents/tasks.json` directly.
 - Do not read or edit `.claude/` files.

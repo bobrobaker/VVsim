@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from scripts.agents.run_codex_task import _safe_name, run
+from scripts.agents.run_codex_task import _safe_name, _warn_protocol_staleness, run
 from scripts.agents.task_queue import get_task, load_tasks, read_run_metadata
 
 
@@ -167,7 +167,7 @@ def test_base_commit_preserved_if_set(git_repo, tasks_path):
 
 @pytest.fixture
 def fake_codex(tmp_path):
-    """A fake codex binary that emits a valid JSON result."""
+    """A fake codex binary: parses -o flag and writes a valid JSON result to that path."""
     result = {
         "task_id": "t-fake",
         "status": "success",
@@ -180,7 +180,21 @@ def fake_codex(tmp_path):
         "metadata": {},
     }
     script = tmp_path / "fake_codex"
-    script.write_text(f"#!/bin/sh\necho '{json.dumps(result)}'\n")
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys, json\n"
+        "args = sys.argv[1:]\n"
+        "output_file = None\n"
+        "i = 0\n"
+        "while i < len(args):\n"
+        "    if args[i] == '-o' and i + 1 < len(args):\n"
+        "        output_file = args[i + 1]; i += 2\n"
+        "    else:\n"
+        "        i += 1\n"
+        f"result = {json.dumps(result)}\n"
+        "if output_file:\n"
+        "    open(output_file, 'w').write(json.dumps(result))\n"
+    )
     script.chmod(0o755)
     return str(script)
 
@@ -211,15 +225,16 @@ def test_real_codex_path_failure(git_repo, tasks_path, failing_codex):
     assert task["status"] == "failed"
 
 
-def test_real_codex_non_json_output(git_repo, tasks_path, tmp_path):
-    bad_codex = tmp_path / "bad_codex"
-    bad_codex.write_text("#!/bin/sh\necho 'not json'\n")
-    bad_codex.chmod(0o755)
+def test_real_codex_no_result_file(git_repo, tasks_path, tmp_path):
+    """Fake codex exits 0 but does not write to -o → harness reports failure."""
+    no_result_codex = tmp_path / "no_result_codex"
+    no_result_codex.write_text("#!/bin/sh\necho 'did nothing'\n")
+    no_result_codex.chmod(0o755)
     _seed_task(tasks_path, _task(task_id="t-badjson"))
-    result = run("t-badjson", dry_run=False, codex_bin=str(bad_codex),
+    result = run("t-badjson", dry_run=False, codex_bin=str(no_result_codex),
                  repo_root=git_repo, tasks_path=tasks_path)
     assert result["status"] == "failed"
-    assert "not valid JSON" in result["summary"]
+    assert "no result file" in result["summary"]
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +243,7 @@ def test_real_codex_non_json_output(git_repo, tasks_path, tmp_path):
 
 @pytest.fixture
 def editing_codex(tmp_path):
-    """Fake codex that writes and commits a file, then emits a valid JSON result."""
+    """Fake codex that writes and commits a file, then writes a valid JSON result to -o."""
     result = {
         "task_id": "t-edit",
         "status": "success",
@@ -242,11 +257,22 @@ def editing_codex(tmp_path):
     }
     script = tmp_path / "editing_codex"
     script.write_text(
-        "#!/bin/sh\n"
-        "echo 'codex output' > codex_output.txt\n"
-        "git add codex_output.txt >&2\n"
-        "git commit -m 'codex edit' >&2\n"
-        f"echo '{json.dumps(result)}'\n"
+        "#!/usr/bin/env python3\n"
+        "import sys, json, subprocess\n"
+        "args = sys.argv[1:]\n"
+        "output_file = None\n"
+        "i = 0\n"
+        "while i < len(args):\n"
+        "    if args[i] == '-o' and i + 1 < len(args):\n"
+        "        output_file = args[i + 1]; i += 2\n"
+        "    else:\n"
+        "        i += 1\n"
+        "open('codex_output.txt', 'w').write('codex output\\n')\n"
+        "subprocess.run(['git', 'add', 'codex_output.txt'], check=True, capture_output=True)\n"
+        "subprocess.run(['git', 'commit', '-m', 'codex edit'], check=True, capture_output=True)\n"
+        f"result = {json.dumps(result)}\n"
+        "if output_file:\n"
+        "    open(output_file, 'w').write(json.dumps(result))\n"
     )
     script.chmod(0o755)
     return str(script)
@@ -322,11 +348,22 @@ def test_files_changed_mismatch_flagged(git_repo, tasks_path, tmp_path):
     }
     script = tmp_path / "mismatch_codex"
     script.write_text(
-        "#!/bin/sh\n"
-        "echo 'actual output' > actual_output.txt\n"
-        "git add actual_output.txt >&2\n"
-        "git commit -m 'codex edit' >&2\n"
-        f"echo '{json.dumps(result)}'\n"
+        "#!/usr/bin/env python3\n"
+        "import sys, json, subprocess\n"
+        "args = sys.argv[1:]\n"
+        "output_file = None\n"
+        "i = 0\n"
+        "while i < len(args):\n"
+        "    if args[i] == '-o' and i + 1 < len(args):\n"
+        "        output_file = args[i + 1]; i += 2\n"
+        "    else:\n"
+        "        i += 1\n"
+        "open('actual_output.txt', 'w').write('actual output\\n')\n"
+        "subprocess.run(['git', 'add', 'actual_output.txt'], check=True, capture_output=True)\n"
+        "subprocess.run(['git', 'commit', '-m', 'codex edit'], check=True, capture_output=True)\n"
+        f"result = {json.dumps(result)}\n"
+        "if output_file:\n"
+        "    open(output_file, 'w').write(json.dumps(result))\n"
     )
     script.chmod(0o755)
     _seed_task(tasks_path, _task(task_id="t-mismatch", base_commit=""))
@@ -334,6 +371,38 @@ def test_files_changed_mismatch_flagged(git_repo, tasks_path, tmp_path):
         repo_root=git_repo, tasks_path=tasks_path)
     meta = read_run_metadata("t-mismatch", runs_dir=git_repo / ".agents" / "runs")
     assert meta["files_changed_mismatch"] is True
+
+
+# ---------------------------------------------------------------------------
+# Preflight staleness warning
+# ---------------------------------------------------------------------------
+
+def test_preflight_no_warning_on_clean_repo(git_repo, capsys):
+    """Clean repo produces no staleness warning."""
+    _warn_protocol_staleness(git_repo)
+    captured = capsys.readouterr()
+    assert "WARNING" not in captured.err
+
+
+def test_preflight_warns_on_dirty_protocol_file(git_repo, capsys):
+    """Uncommitted change to a protocol file triggers a warning."""
+    agents_md = git_repo / "AGENTS.md"
+    agents_md.write_text("dirty content\n")
+    subprocess.run(["git", "-C", str(git_repo), "add", str(agents_md)], capture_output=True)
+    _warn_protocol_staleness(git_repo)
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.err
+    assert "AGENTS.md" in captured.err
+
+
+def test_preflight_no_warning_for_unrelated_dirty_file(git_repo, capsys):
+    """Uncommitted change outside protocol paths produces no warning."""
+    other = git_repo / "unrelated.txt"
+    other.write_text("irrelevant\n")
+    subprocess.run(["git", "-C", str(git_repo), "add", str(other)], capture_output=True)
+    _warn_protocol_staleness(git_repo)
+    captured = capsys.readouterr()
+    assert "WARNING" not in captured.err
 
 
 def test_dry_run_artifacts_created(git_repo, tasks_path):

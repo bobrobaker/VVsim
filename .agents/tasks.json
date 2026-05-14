@@ -1,1 +1,29 @@
-[]
+[
+  {
+    "task_id": "scout-castable-20260513-001",
+    "base_commit": "bd5ec6e2430120c0ccde291283b2a2bc6ed115d0",
+    "title": "Scout: count cards generating CAST_SPELL actions from fixed GameState",
+    "description": "Read-only scout task. For each card in the default active deck, construct a GameState and call generate_actions(state) directly. Report which cards produce at least one action with action_type == CAST_SPELL.\n\nState setup per card:\n- state.hand = [card]\n- state.floating_mana = ManaPool(R=1)\n- battlefield = [Permanent(card=get_card('Volcanic Island'), tapped=True)]\n- state.vivi_on_battlefield = True\n- state.vivi_available_as_creature_to_tap = True\n- state.legendary_permanent_available = True\n- state.land_play_available = False\n- state.stack = []\n- state.pending_choices = []\n- all other fields: GameState defaults\n\nDo NOT call simulate_run. Do NOT trigger Curiosity draw. Call generate_actions(state) directly.\n\nGrep for ActionType, get_deck_list (or equivalent), Permanent, and GameState constructor before reading files. Use whatever function exists in card_db or data layer to enumerate all cards in the active deck.\n\nReturn ONLY a JSON result file at the path specified by the run harness. JSON structure:\n{\n  \"total_cards_checked\": N,\n  \"castable_count\": M,\n  \"not_castable_count\": K,\n  \"castable_cards\": [\n    {\"card_name\": \"...\", \"cast_actions\": [\"description1\", ...]}\n  ],\n  \"not_castable_cards\": [\"card1\", ...],\n  \"ambiguous_or_errors\": [\n    {\"card_name\": \"...\", \"issue\": \"...\"}\n  ],\n  \"assumptions\": \"...\"\n}\n\nThis is read-only: no source file edits, no test creation. Temporary scratch execution is allowed.",
+    "acceptance_criteria": [
+      "Result JSON contains total_cards_checked, castable_count, not_castable_count, castable_cards, not_castable_cards, ambiguous_or_errors, and assumptions fields.",
+      "Each castable card entry lists at least one cast_action description string.",
+      "No source files are modified.",
+      "No test files are created."
+    ],
+    "files_in_scope": [],
+    "files_off_limits": [
+      "mtg_sim/sim/",
+      "mtg_sim/tests/",
+      "mtg_sim/data/",
+      "mtg_sim/scripts/"
+    ],
+    "validation_commands": [],
+    "created_at": "2026-05-13T00:00:00Z",
+    "metadata": {
+      "type": "scout",
+      "read_only": true
+    },
+    "status": "failed",
+    "status_updated_at": "2026-05-14T02:17:35.104212+00:00"
+  }
+]

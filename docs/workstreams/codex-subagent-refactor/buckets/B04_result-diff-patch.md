@@ -28,7 +28,7 @@ Context budget: Read parent + this bucket + required touchpoints only.
   Main edit surface.
 - `[scripts/agents/task_queue.py]  full file  status/run helpers`
   Update status and metadata.
-- `[.agents/schemas/implementation_result.schema.json]  full file  result schema`
+- `[.agents/schemas/implementation_result.json]  full file  result schema`
   Validate JSON-only Codex result.
 - `[tests/agents/test_run_codex_task.py]  full file  runner tests`
   Extend fake-result coverage.

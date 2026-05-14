@@ -78,7 +78,7 @@ Codex edits a temporary checkout under `.agents/worktrees/<task_id>/`, not the m
 Codex may:
 - implement the assigned task,
 - run requested validation,
-- write JSON result,
+- return JSON result as its final response (captured by harness via `-o`),
 - propose follow-up tasks inside the result JSON.
 
 Codex may not:

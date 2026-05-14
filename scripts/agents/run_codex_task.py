@@ -5,6 +5,11 @@ Usage:
 
 The task must already exist in .agents/tasks.json. Use --dry-run for tests and
 local development; it emits a canned result without requiring Codex auth.
+
+Codex invocation (non-dry-run):
+    codex exec -C <worktree> -s workspace-write -o <result_file> [--output-schema <schema>] -
+    Prompt is piped via stdin. Result is captured by -o; Codex must NOT manually write
+    the result artifact. The harness reads result_file after Codex exits.
 """
 
 import argparse
@@ -85,34 +90,114 @@ def _run_dry(task: dict) -> dict:
     }
 
 
+def _build_prompt(task: dict) -> str:
+    lines = [
+        f"# Task: {task['title']}",
+        "",
+        "## ImplementationTask",
+        "",
+        "```json",
+        json.dumps(task, indent=2),
+        "```",
+        "",
+        task["description"],
+        "",
+    ]
+
+    criteria = task.get("acceptance_criteria") or []
+    if criteria:
+        lines.append("## Acceptance criteria")
+        for c in criteria:
+            lines.append(f"- {c}")
+        lines.append("")
+
+    off_limits = task.get("files_off_limits") or []
+    if off_limits:
+        lines.append("## Files off-limits (do not modify)")
+        for f in off_limits:
+            lines.append(f"- {f}")
+        lines.append("")
+
+    validation = task.get("validation_commands") or []
+    if validation:
+        lines.append("## Validation commands")
+        for cmd in validation:
+            lines.append(f"- `{cmd}`")
+        lines.append("")
+
+    lines += [
+        "## Output",
+        "Return your final answer as raw JSON matching ImplementationResult.",
+        "Do not wrap in markdown. Do not manually write the result artifact;",
+        "`codex exec --output-last-message / -o` captures your final response.",
+    ]
+    return "\n".join(lines)
+
+
 def _run_codex(task: dict, codex_bin: str, worktree_path: Path) -> dict:
-    task_file = worktree_path / HANDOFFS_DIR / f"task_{task['task_id']}.json"
+    worktree_path = Path(worktree_path).resolve()  # absolute so -o and -C are unambiguous
+    safe = _safe_name(task["task_id"])
+    result_file = worktree_path / f"codex_result_{safe}.json"
+    schema_path = worktree_path / ".agents" / "schemas" / "implementation_result.json"
+
+    prompt = _build_prompt(task)
+
+    cmd = [
+        codex_bin, "exec",
+        "-C", str(worktree_path),
+        "-s", "workspace-write",
+        "-o", str(result_file),
+    ]
+    if schema_path.exists():
+        cmd += ["--output-schema", str(schema_path)]
+    cmd.append("-")  # read prompt from stdin
+
     proc = subprocess.run(
-        [codex_bin, "--task-file", str(task_file)],
+        cmd,
+        input=prompt,
         cwd=worktree_path,
         capture_output=True,
         text=True,
     )
+
     if proc.returncode != 0:
         return {
             "task_id": task["task_id"],
             "status": "failed",
             "summary": f"Codex exited with code {proc.returncode}",
-            "issues": [proc.stderr.strip()],
+            "issues": [proc.stderr.strip() or proc.stdout.strip()],
             "completed_at": _now_iso(),
             "metadata": {"exit_code": proc.returncode},
         }
+
+    if not result_file.exists():
+        return {
+            "task_id": task["task_id"],
+            "status": "failed",
+            "summary": "Codex produced no result file (expected via -o / --output-last-message)",
+            "issues": [proc.stdout[:500]] if proc.stdout.strip() else [],
+            "completed_at": _now_iso(),
+            "metadata": {},
+        }
+
     try:
-        return json.loads(proc.stdout)
+        result = json.loads(result_file.read_text())
     except json.JSONDecodeError as e:
         return {
             "task_id": task["task_id"],
             "status": "failed",
-            "summary": "Codex output was not valid JSON",
-            "issues": [str(e), proc.stdout[:500]],
+            "summary": "Result file was not valid JSON",
+            "issues": [str(e), result_file.read_text()[:500]],
             "completed_at": _now_iso(),
             "metadata": {},
         }
+
+    if "status" not in result:
+        result["status"] = "success"
+    if "task_id" not in result:
+        result["task_id"] = task["task_id"]
+
+    return result
 
 
 def _capture_diff(safe_id: str, worktree_path: Path, base_commit: str, runs_dir: Path) -> Path:
@@ -147,6 +232,44 @@ def _copy_result(safe_id: str, result: dict, repo_root: Path) -> Path:
     return dest
 
 
+# Directories/files that Codex reads from the worktree for protocol behaviour.
+# Uncommitted changes here won't reach the worktree and will silently stale Codex.
+_PROTOCOL_PATHS = (
+    ".agents/schemas/",
+    ".agents/skills/",
+    ".agents/config.toml",
+    ".claude/skills/",
+    "AGENTS.md",
+    "scripts/agents/",
+    "tests/agents/",
+)
+
+
+def _warn_protocol_staleness(repo_root: Path) -> None:
+    """Warn if uncommitted working-tree changes touch Route B protocol files.
+
+    The worktree is created from HEAD; any uncommitted edits to protocol files
+    won't be present, so Codex may run against stale schemas or instructions.
+    """
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return  # not a git repo or git unavailable; skip silently
+    dirty = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+    stale = [f for f in dirty if any(f.startswith(p) for p in _PROTOCOL_PATHS)]
+    if stale:
+        print(
+            "WARNING: uncommitted changes to Route B protocol files will NOT be present "
+            "in the Codex worktree. Commit them before running to avoid stale behaviour.\n"
+            "  Stale files: " + ", ".join(stale),
+            file=sys.stderr,
+        )
+
+
 def _changed_files_from_diff(diff_text: str) -> list[str]:
     files = []
     for line in diff_text.splitlines():
@@ -178,6 +301,7 @@ def run(
 
     update_task_status(task_id, "running", path=tasks_path)
 
+    _warn_protocol_staleness(repo_root)
     worktree_path = _create_worktree(task_id, repo_root)
     _write_task_artifact(task, worktree_path)
 
