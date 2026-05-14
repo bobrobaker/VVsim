@@ -1,0 +1,41 @@
+{
+  "task_id": "b03-strike-it-rich-flashback-20260513",
+  "worktree_path": ".agents/worktrees/b03-strike-it-rich-flashback-20260513",
+  "base_commit": "d2abf2b9b6d5fa4e3a0775779f94028b5e213e97",
+  "dry_run": false,
+  "result": {
+    "task_id": "b03-strike-it-rich-flashback-20260513",
+    "status": "success",
+    "summary": "Fixed graveyard flashback action generation so Strike It Rich only generates flashback cast actions from graveyard, preserving the sorcery-speed stack gate and avoiding normal hand-cast actions from graveyard. Added focused Strike It Rich tests covering insufficient mana, flashback-only action generation, and exile-on-resolution behavior.",
+    "files_changed": [
+      "mtg_sim/sim/action_generator.py",
+      "mtg_sim/tests/test_misc_spells.py"
+    ],
+    "validation_results": [
+      {
+        "command": "python3 -m pytest mtg_sim/tests/test_misc_spells.py -k strike_it_rich -q -W ignore::UserWarning",
+        "exit_code": 0,
+        "stdout": "...                                                                      [100%]\n3 passed, 47 deselected in 0.05s\n",
+        "stderr": ""
+      },
+      {
+        "command": "python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning",
+        "exit_code": 0,
+        "stdout": "........................................................................ [ 17%]\n........................................................................ [ 34%]\n........................................................................ [ 51%]\n........................................................................ [ 68%]\n........................................................................ [ 85%]\n...........................................................              [100%]\n419 passed in 1.62s\n",
+        "stderr": ""
+      }
+    ],
+    "issues": [],
+    "proposed_followup_tasks": [],
+    "completed_at": "2026-05-13T22:45:34-07:00"
+  },
+  "result_path": ".agents/handoffs/codex_to_claude/result_b03-strike-it-rich-flashback-20260513.json",
+  "diff_path": ".agents/runs/b03-strike-it-rich-flashback-20260513.diff",
+  "patch_path": ".agents/runs/b03-strike-it-rich-flashback-20260513.patch",
+  "changed_files_actual": [
+    "mtg_sim/sim/action_generator.py",
+    "mtg_sim/tests/test_misc_spells.py"
+  ],
+  "files_changed_mismatch": false,
+  "run_at": "2026-05-14T05:45:43.097299+00:00"
+}

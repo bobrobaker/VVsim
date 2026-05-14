@@ -2,6 +2,15 @@
 
 Qualitative findings from past sessions. Append new entries via `/introspect`.
 
+## B03 Strike It Rich Flashback
+
+- Token ratio ~3:1. Clean, efficient session. Bug found immediately from required touchpoint read. Codex produced correct output on first run.
+- Useful: action_generator.py 216-238 (found bug), 230-309 (understood full function to spec the fix accurately), resolver.py (confirmed zone movement correct), tasks.json (insert point).
+- Drain 1: `mana.py:1-30` — read to confirm `ANY` field; `grep "ANY" mana.py` answers in one line. Existing CLAUDE.md rule covers this (grep for fields) — apply more strictly for single-field attribute checks.
+- Drain 2: `test_misc_spells.py:1-48` — got import list; `grep "^from\|^import"` would have been lighter. Acceptable given tests.md rule was followed (grep first, then small targeted read).
+- Drain 3: `resolver.py` + `card_behaviors.py` Required touchpoints — confirmed "already correct" with no fix needed. Same pattern as B02; these were Required but acted as Conditional.
+- No recurring mistakes. No routing changes needed.
+
 ## Route B Scout / Protocol Hardening
 
 **Session:** 2026-05-13. Ran outsource-codex scout (99 cards, 26 castable). Fixed Route B protocol: `codex exec -o` contract, OpenAI strict schema (3 fix cycles), worktree-from-HEAD propagation, SKILL.md frontmatter, preflight staleness warning. 85 agents tests pass.
@@ -499,3 +508,45 @@ None recurred from prior sessions.
 - Drain 2: tail read of test file to find insertion point — grep for last `^def test` would have been lighter.
 - Drain 3: baseline auto-load (unavoidable).
 - No recurring mistakes. No routing changes needed.
+
+## B01 Sorcery + Harness Fix
+
+**Session:** 2026-05-13. Completed B01 (Wild Ride Instant→Sorcery in card_library.csv) and fixed outsource-codex patch pipeline (empty patch bug).
+
+### Estimated token ratio
+
+~7:1 input:output. Heavy — interactive corrections, large JSONL/JSON reads, multiple harness file iterations.
+
+### What was useful
+
+- workstream.md + B01 bucket — essential routing and touchpoints.
+- `action_generator.py` lines 220-250 — confirmed gate already correct; fix was data only.
+- Harness file reads (run_codex_task.py, apply_codex_patch.py, test files) — all earned for diagnosis and implementation.
+
+### Main token drains
+
+1. **JSONL sed read (48KB)** — `sed -n '48,55p'` on manual_observations.jsonl streamed a full multi-KB JSON snapshot. `awk 'NR==51'` used on retry. Routed to sim-notes.md.
+2. **Scout run JSON (187KB)** — read whole file to confirm Wild Ride castable; `grep "Wild Ride"` would have answered in one line. Routed to run_codex_task.py companion doc.
+3. **Card data file search cascade** — tried cards.json, find .json, find .csv before finding card_library.csv at repo root. Routed to new cards.py companion doc.
+
+### Recurring mistakes
+
+- AGENTS.md full-read: not recurred. ✓
+- Road.md workstream routing: not recurred. ✓
+- JSONL line reads via sed: first occurrence; now routed.
+
+### Concrete recommendations
+
+- `sim-notes.md`: JSONL awk gotcha added.
+- New `docs/notes/mtg_sim/sim/cards.py.md`: card_library.csv location + column layout.
+- `run_codex_task.py.md`: grep run artifacts instead of full read.
+- `workstream_bucket_generator_prompt.md`: Updates ordering rule (append, not prepend) added to both workstream and bucket rules.
+
+## B02 Daze Tapped Island
+
+- Token ratio ~4:1. Very short efficient session. One-line fix + one new test + JSONL reproduction.
+- Useful: all required touchpoints earned — action_generator.py 12-line read found the bug immediately; card_behaviors.py confirmed action construction; JSONL line 51 confirmed tapped Volcanic Island.
+- Drain 1: resolver.py:115-120 — passive sanity check only; confirmed nothing surprising. Bucket classified it as Required but it was Conditional at best.
+- Drain 2: test_counterspells.py:24-31 extra read (helper body) — grep for signature would have answered in one line.
+- Drain 3: baseline auto-loads — dominated since actual work was tiny.
+- No recurring mistakes. Routed: workstream_bucket_generator_prompt.md — resolver touchpoints should be Conditional, not Required, for action-gen-only buckets.

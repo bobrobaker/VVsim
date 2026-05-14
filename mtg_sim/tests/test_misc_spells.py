@@ -142,6 +142,54 @@ def test_blazing_shoal_no_actions_without_creature_target():
     assert len(shoal_acts) == 0, "Blazing Shoal needs a creature target"
 
 
+# -- Strike It Rich --
+
+def test_strike_it_rich_no_action_with_only_R_in_graveyard():
+    state = _state([], ManaPool(R=1))
+    state.graveyard = ["Strike It Rich"]
+
+    actions = generate_actions(state)
+    acts = [a for a in actions
+            if a.action_type == CAST_SPELL and a.source_card == "Strike It Rich"]
+
+    assert not acts
+
+
+def test_strike_it_rich_flashback_requires_2R():
+    state = _state([], ManaPool(R=1, ANY=2))
+    state.graveyard = ["Strike It Rich"]
+
+    actions = generate_actions(state)
+    flashback_acts = [a for a in actions
+                      if a.action_type == CAST_SPELL
+                      and a.source_card == "Strike It Rich"
+                      and a.alt_cost_type == "flashback"]
+    non_flashback_acts = [a for a in actions
+                          if a.action_type == CAST_SPELL
+                          and a.source_card == "Strike It Rich"
+                          and a.alt_cost_type != "flashback"]
+
+    assert len(flashback_acts) == 1
+    assert not non_flashback_acts
+
+
+def test_strike_it_rich_flashback_resolves_to_exile():
+    state = _state([], ManaPool(R=1, ANY=2))
+    state.graveyard = ["Strike It Rich"]
+
+    actions = generate_actions(state)
+    act = next(a for a in actions
+               if a.action_type == CAST_SPELL
+               and a.source_card == "Strike It Rich"
+               and a.alt_cost_type == "flashback")
+
+    resolve_action(state, act)
+    _drain_stack(state)
+
+    assert "Strike It Rich" in state.exile
+    assert "Strike It Rich" not in state.graveyard
+
+
 # ── Baubles ───────────────────────────────────────────────────────────────────
 
 def test_mishra_bauble_resolves_to_battlefield():
@@ -220,6 +268,28 @@ def test_boomerang_basics_sorcery_speed_only():
     actions = generate_actions(state)
     acts = [a for a in actions if a.source_card == "Boomerang Basics"]
     assert len(acts) == 0, "Boomerang Basics should not be castable while stack is nonempty"
+
+
+def test_wild_ride_not_castable_with_stack_nonempty():
+    from mtg_sim.sim.stack import StackObject
+    state = _state(["Wild Ride"], ManaPool(R=1))
+    state.stack.append(StackObject(card_name="Mishra's Bauble"))
+    actions = generate_actions(state)
+    acts = [
+        a for a in actions
+        if a.source_card == "Wild Ride" and a.action_type == CAST_SPELL
+    ]
+    assert len(acts) == 0, "Wild Ride should not be castable while stack is nonempty"
+
+
+def test_wild_ride_castable_with_empty_stack():
+    state = _state(["Wild Ride"], ManaPool(R=1))
+    actions = generate_actions(state)
+    acts = [
+        a for a in actions
+        if a.source_card == "Wild Ride" and a.action_type == CAST_SPELL
+    ]
+    assert len(acts) >= 1, "Wild Ride should be castable with an empty stack"
 
 
 def test_boomerang_basics_bounces_own_permanent():

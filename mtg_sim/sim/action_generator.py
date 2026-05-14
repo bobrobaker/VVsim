@@ -222,7 +222,12 @@ def _gen_cast_actions(state: GameState) -> list[Action]:
         cd = get_card(card_name)
         if cd is None or cd.is_land or not cd.alt_costs or "flashback" not in cd.alt_costs:
             continue
-        actions += _gen_normal_and_alt_cast_actions(state, card_name, cd)
+        is_instant_speed = cd.is_instant or cd.has_flash
+        if state.stack and not is_instant_speed:
+            continue
+        for tok in _parse_alt_costs(cd.alt_costs):
+            if tok.startswith("alt:flashback_"):
+                actions += _gen_alt_cost_actions(state, card_name, cd, tok)
 
     return actions
 
@@ -798,7 +803,7 @@ def _is_island(perm) -> bool:
 
 
 def _islands_on_battlefield(state: GameState) -> list:
-    return [p for p in state.battlefield if _is_island(p) and not p.tapped]
+    return [p for p in state.battlefield if _is_island(p)]
 
 
 _MOUNTAIN_LANDS = frozenset({

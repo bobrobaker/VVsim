@@ -1,0 +1,77 @@
+diff --git a/mtg_sim/sim/action_generator.py b/mtg_sim/sim/action_generator.py
+index 1e48e16..9990216 100644
+--- a/mtg_sim/sim/action_generator.py
++++ b/mtg_sim/sim/action_generator.py
+@@ -222,7 +222,12 @@ def _gen_cast_actions(state: GameState) -> list[Action]:
+         cd = get_card(card_name)
+         if cd is None or cd.is_land or not cd.alt_costs or "flashback" not in cd.alt_costs:
+             continue
+-        actions += _gen_normal_and_alt_cast_actions(state, card_name, cd)
++        is_instant_speed = cd.is_instant or cd.has_flash
++        if state.stack and not is_instant_speed:
++            continue
++        for tok in _parse_alt_costs(cd.alt_costs):
++            if tok.startswith("alt:flashback_"):
++                actions += _gen_alt_cost_actions(state, card_name, cd, tok)
+ 
+     return actions
+ 
+diff --git a/mtg_sim/tests/test_misc_spells.py b/mtg_sim/tests/test_misc_spells.py
+index 6c07c5e..fd09829 100644
+--- a/mtg_sim/tests/test_misc_spells.py
++++ b/mtg_sim/tests/test_misc_spells.py
+@@ -142,6 +142,54 @@ def test_blazing_shoal_no_actions_without_creature_target():
+     assert len(shoal_acts) == 0, "Blazing Shoal needs a creature target"
+ 
+ 
++# -- Strike It Rich --
++
++def test_strike_it_rich_no_action_with_only_R_in_graveyard():
++    state = _state([], ManaPool(R=1))
++    state.graveyard = ["Strike It Rich"]
++
++    actions = generate_actions(state)
++    acts = [a for a in actions
++            if a.action_type == CAST_SPELL and a.source_card == "Strike It Rich"]
++
++    assert not acts
++
++
++def test_strike_it_rich_flashback_requires_2R():
++    state = _state([], ManaPool(R=1, ANY=2))
++    state.graveyard = ["Strike It Rich"]
++
++    actions = generate_actions(state)
++    flashback_acts = [a for a in actions
++                      if a.action_type == CAST_SPELL
++                      and a.source_card == "Strike It Rich"
++                      and a.alt_cost_type == "flashback"]
++    non_flashback_acts = [a for a in actions
++                          if a.action_type == CAST_SPELL
++                          and a.source_card == "Strike It Rich"
++                          and a.alt_cost_type != "flashback"]
++
++    assert len(flashback_acts) == 1
++    assert not non_flashback_acts
++
++
++def test_strike_it_rich_flashback_resolves_to_exile():
++    state = _state([], ManaPool(R=1, ANY=2))
++    state.graveyard = ["Strike It Rich"]
++
++    actions = generate_actions(state)
++    act = next(a for a in actions
++               if a.action_type == CAST_SPELL
++               and a.source_card == "Strike It Rich"
++               and a.alt_cost_type == "flashback")
++
++    resolve_action(state, act)
++    _drain_stack(state)
++
++    assert "Strike It Rich" in state.exile
++    assert "Strike It Rich" not in state.graveyard
++
++
+ # ── Baubles ───────────────────────────────────────────────────────────────────
+ 
+ def test_mishra_bauble_resolves_to_battlefield():

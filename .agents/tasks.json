@@ -23,7 +23,68 @@
       "type": "scout",
       "read_only": true
     },
-    "status": "failed",
-    "status_updated_at": "2026-05-14T02:17:35.104212+00:00"
+    "status": "result_ready",
+    "status_updated_at": "2026-05-14T02:43:15.467716+00:00"
+  },
+  {
+    "task_id": "b01-sorcery-stack-timing-20260513",
+    "base_commit": "d2abf2b9b6d5fa4e3a0775779f94028b5e213e97",
+    "title": "B01: Block Wild Ride (sorcery) from being castable while stack is nonempty",
+    "description": "## Context\n\nWorkstream: manual-log-bugfixes / Bucket B01.\n\nBug: `card_library.csv` line 100 lists Wild Ride with card_type `Instant`, but Wild Ride is a Sorcery. Because the sorcery-speed gate in `action_generator.py:_gen_normal_and_alt_cast_actions` checks `cd.is_instant or cd.has_flash`, Wild Ride bypasses the gate and appears as a legal cast action even when the stack is nonempty.\n\nEvidence: `mtg_sim/scripts/logs/manual_observations.jsonl` line 51 (JSONL entry, entry_type=manual_decision_snapshot) shows Wild Ride offered as action index 0 while Mishra's Bauble is on the stack.\n\n## Required fix\n\n1. Change Wild Ride's `card_types` column in `card_library.csv` from `Instant` to `Sorcery`. The CSV line to change is:\n   `99,Wild Ride,{R},1,R,0,1,0,0,false,Instant,...`\n   Change `Instant` (11th column, 0-indexed column 10) to `Sorcery`.\n\n2. Write two focused unit tests in `mtg_sim/tests/test_misc_spells.py` (or a new file if that is not appropriate \u2014 check first):\n   - `test_wild_ride_not_castable_with_stack_nonempty`: build a GameState with Wild Ride in hand, a StackObject on the stack, and enough mana (R=1). Assert that no action with source_card == 'Wild Ride' and action_type == CAST_SPELL appears in generate_actions(state).\n   - `test_wild_ride_castable_with_empty_stack`: build a GameState with Wild Ride in hand, empty stack, ManaPool(R=1). Assert that a Cast Wild Ride action IS present.\n\n3. Reproduce the JSONL line 51 state minimally: Wild Ride in hand, Mishra's Bauble StackObject on the stack, R=1 mana. Assert no Cast Wild Ride action. This can be an assertion within one of the above tests or a separate helper.\n\n## Implementation notes\n\n- `card_library.csv` is the source of card data. `mtg_sim/sim/cards.py` loads it. `CardData.is_instant` returns `'Instant' in self.card_types`. `CardData.is_sorcery` returns `'Sorcery' in self.card_types`.\n- The sorcery-speed gate is at `mtg_sim/sim/action_generator.py` in `_gen_normal_and_alt_cast_actions`: `if state.stack and not is_instant_speed: return actions`. No change to `action_generator.py` should be needed.\n- Wild Ride also has an alt cost (harmonize flashback-like). If that alt cost is generated via the same `_gen_normal_and_alt_cast_actions`, it will also be blocked on stack. That is correct \u2014 sorcery flashback is also sorcery speed in this simulator.\n- Before writing tests: grep `Action(` and `_state` in `test_misc_spells.py` to match existing helper and Action constructor patterns. Grep `StackObject` constructor to match stack setup.\n- Workflow: test first (confirm it fails with current code), fix CSV, confirm test passes.\n\n## Validation\n\n- `python3 -m pytest mtg_sim/tests/test_misc_spells.py -k wild_ride -q -W ignore::UserWarning`\n- `python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning` (full suite, no regressions)",
+    "acceptance_criteria": [
+      "card_library.csv Wild Ride row has card_types = 'Sorcery' (not 'Instant').",
+      "test_wild_ride_not_castable_with_stack_nonempty passes: no Cast Wild Ride action when stack is nonempty.",
+      "test_wild_ride_castable_with_empty_stack passes: Cast Wild Ride action present when stack is empty and R=1.",
+      "Full test suite passes with no regressions (`python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning`)."
+    ],
+    "files_in_scope": [
+      "card_library.csv",
+      "mtg_sim/tests/test_misc_spells.py"
+    ],
+    "files_off_limits": [
+      "mtg_sim/sim/action_generator.py",
+      ".agents/"
+    ],
+    "validation_commands": [
+      "python3 -m pytest mtg_sim/tests/test_misc_spells.py -k wild_ride -q -W ignore::UserWarning",
+      "python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning"
+    ],
+    "created_at": "2026-05-13T00:00:00Z",
+    "metadata": {
+      "workstream": "manual-log-bugfixes",
+      "bucket": "B01"
+    },
+    "status": "cleaned",
+    "status_updated_at": "2026-05-14T05:21:13.338639+00:00"
+  },
+  {
+    "task_id": "b03-strike-it-rich-flashback-20260513",
+    "base_commit": "d2abf2b9b6d5fa4e3a0775779f94028b5e213e97",
+    "title": "B03: Fix Strike It Rich flashback cost/zone (graveyard loop generates normal hand-cast)",
+    "description": "## Context\n\nWorkstream: manual-log-bugfixes / Bucket B03.\n\nBug: `action_generator.py:216-225` (graveyard flashback loop) calls `_gen_normal_and_alt_cast_actions(state, card_name, cd)`. That function generates BOTH the normal hand-cast action (mana cost `{R}`) AND the flashback alt-cost action (`{2}{R}`). When Strike It Rich is in the graveyard with only `{R}` floating, the normal hand-cast action is incorrectly generated\u2014Strike It Rich can only be cast from the graveyard via flashback.\n\nEvidence: `mtg_sim/scripts/logs/manual_observations.jsonl` line 100 shows a state with floating_mana={R:1}, graveyard=[\"Strike It Rich\", \"Mox Diamond\"], stack=[]. In this state, no Strike It Rich action should appear (flashback requires {2}{R}).\n\nThe flashback zone movement (graveyard \u2192 exile on resolution) is already implemented in `resolver.py:243-244` and `resolver.py:137-146`.\n\n## Required fix\n\nChange `action_generator.py` lines 216-225 (the graveyard flashback loop). Replace the call to `_gen_normal_and_alt_cast_actions` with a loop that:\n1. Preserves the sorcery-speed gate: if the stack is nonempty and the card is not instant-speed (`cd.is_instant or cd.has_flash`), skip.\n2. Only generates flashback tokens (those starting with `alt:flashback_`) by calling `_gen_alt_cost_actions` directly.\n\nCurrent code (lines 216-225):\n```python\n    # Graveyard: generate flashback (and other graveyard-cast alt costs) separately\n    seen_gy: set[str] = set()\n    for card_name in state.graveyard:\n        if card_name in seen_gy or card_name in seen:\n            continue\n        seen_gy.add(card_name)\n        cd = get_card(card_name)\n        if cd is None or cd.is_land or not cd.alt_costs or \"flashback\" not in cd.alt_costs:\n            continue\n        actions += _gen_normal_and_alt_cast_actions(state, card_name, cd)\n```\n\nReplace with:\n```python\n    # Graveyard: generate flashback (and other graveyard-cast alt costs) separately\n    seen_gy: set[str] = set()\n    for card_name in state.graveyard:\n        if card_name in seen_gy or card_name in seen:\n            continue\n        seen_gy.add(card_name)\n        cd = get_card(card_name)\n        if cd is None or cd.is_land or not cd.alt_costs or \"flashback\" not in cd.alt_costs:\n            continue\n        is_instant_speed = cd.is_instant or cd.has_flash\n        if state.stack and not is_instant_speed:\n            continue\n        for tok in _parse_alt_costs(cd.alt_costs):\n            if tok.startswith(\"alt:flashback_\"):\n                actions += _gen_alt_cost_actions(state, card_name, cd, tok)\n```\n\n`_parse_alt_costs` is defined in the same file at line 22. `_gen_alt_cost_actions` is defined at line 332.\n\n## Tests to add\n\nAdd to `mtg_sim/tests/test_misc_spells.py` under a `# -- Strike It Rich --` section.\n\nImports already present: `generate_actions`, `ManaPool`, `CAST_SPELL`, `_state`. Check whether `resolve_action` is already imported (it is).\n\nBefore writing tests, grep for `Action(` in the test file to confirm kwarg names, and check `_drain_stack` helper (it exists).\n\nState setup pattern: call `_state(hand, mana)`, then manually set `state.graveyard`. The `_state` helper does not accept a graveyard kwarg:\n```python\nstate = _state([], ManaPool(R=1))\nstate.graveyard = [\"Strike It Rich\"]\n```\n\nWrite these three tests (workflow: write tests first, confirm test 1 fails with current code, implement fix, confirm all pass):\n\n### 1. `test_strike_it_rich_no_action_with_only_R_in_graveyard`\n- Setup: hand=[], mana=ManaPool(R=1), graveyard=[\"Strike It Rich\"], stack empty\n- Assert: no action with `action_type==CAST_SPELL` and `source_card==\"Strike It Rich\"` in generate_actions(state)\n\n### 2. `test_strike_it_rich_flashback_requires_2R`\n- Setup: hand=[], mana=ManaPool(R=1, ANY=2), graveyard=[\"Strike It Rich\"], stack empty\n- Assert: exactly one action with `action_type==CAST_SPELL`, `source_card==\"Strike It Rich\"`, and `action.alt_cost_type==\"flashback\"` is present\n- Assert: no action with `source_card==\"Strike It Rich\"` and `alt_cost_type` not equal to `\"flashback\"` (no normal cast from graveyard)\n\n### 3. `test_strike_it_rich_flashback_resolves_to_exile`\n- Setup: hand=[], mana=ManaPool(R=1, ANY=2), graveyard=[\"Strike It Rich\"], stack empty\n- Find the flashback action, call resolve_action to cast, then call _drain_stack(state)\n- Assert: \"Strike It Rich\" in state.exile\n- Assert: \"Strike It Rich\" not in state.graveyard\n\n## Validation\n\n- `python3 -m pytest mtg_sim/tests/test_misc_spells.py -k strike_it_rich -q -W ignore::UserWarning`\n- `python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning`\n\n## Workflow\n\nWrite tests first. Confirm test 1 fails (action IS incorrectly present with current code). Implement the fix to action_generator.py. Confirm all three tests pass. Run full suite.",
+    "acceptance_criteria": [
+      "test_strike_it_rich_no_action_with_only_R_in_graveyard passes: no CAST_SPELL action for Strike It Rich when graveyard=[Strike It Rich] and mana={R:1}.",
+      "test_strike_it_rich_flashback_requires_2R passes: flashback CAST_SPELL action present with alt_cost_type=='flashback' when mana={R:1, ANY:2}.",
+      "test_strike_it_rich_flashback_resolves_to_exile passes: after flashback cast + stack drain, Strike It Rich in exile not graveyard.",
+      "Full test suite passes with no regressions (python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning)."
+    ],
+    "files_in_scope": [
+      "mtg_sim/sim/action_generator.py",
+      "mtg_sim/tests/test_misc_spells.py"
+    ],
+    "files_off_limits": [
+      ".agents/"
+    ],
+    "validation_commands": [
+      "python3 -m pytest mtg_sim/tests/test_misc_spells.py -k strike_it_rich -q -W ignore::UserWarning",
+      "python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning"
+    ],
+    "created_at": "2026-05-13T00:00:00Z",
+    "metadata": {
+      "workstream": "manual-log-bugfixes",
+      "bucket": "B03"
+    },
+    "status": "cleaned",
+    "status_updated_at": "2026-05-14T05:46:12.759988+00:00"
   }
 ]
