@@ -1,0 +1,20 @@
+{
+  "task_id": "t-001",
+  "worktree_path": "/tmp/pytest-of-bolun/pytest-22/test_base_commit_preserved_if_0/.agents/worktrees/t-001",
+  "base_commit": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+  "dry_run": true,
+  "result": {
+    "task_id": "t-001",
+    "status": "success",
+    "summary": "[dry-run] No real Codex execution. Simulated success.",
+    "files_changed": [],
+    "validation_results": [],
+    "issues": [],
+    "proposed_followup_tasks": [],
+    "completed_at": "2026-05-13T08:42:53.328908+00:00",
+    "metadata": {
+      "dry_run": true
+    }
+  },
+  "run_at": "2026-05-13T08:42:53.328923+00:00"
+}

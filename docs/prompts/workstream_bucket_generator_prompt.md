@@ -113,6 +113,10 @@ States: `next`, `active`, `blocked`, `done`, `deferred`, `later`.
 
 - [Implementation detail relevant across the whole workstream.]
 
+## Estimate
+
+[X–Y tokens — implementation cost, not planning cost. Count reads, edits, tests, and iteration cycles. Exclude the cost of generating this workstream/bucket plan itself.]
+
 ## Updates
 
 - [YYYY-MM-DD HH:MM] Initial plan created. Next: B01/[focus].
@@ -123,6 +127,7 @@ Workstream file rules:
 - Put discoveries here only if they affect later buckets or the whole workstream.
 - Keep `Progress` to one line. Use `Updates` for details.
 - Keep `Bucket Index` as the source of truth for sequencing.
+- `Updates` entries are chronological ascending: **append new entries at the end**, oldest entry first.
 
 ## Bucket template
 
@@ -189,6 +194,7 @@ Bucket file rules:
 - Bucket-specific context lives here, not in the parent.
 - Include only touchpoints needed for this bucket.
 - Use `Updates` for bucket-local discoveries, gotchas, test notes, and handoff.
+- `Updates` entries are chronological ascending: **append new entries at the end**, oldest entry first.
 - Do not let Claude mark a bucket `done` without validation or an explicit explanation of why validation was not possible.
 
 ## Workstream Bucket Generator Updates
@@ -197,3 +203,5 @@ Introspection notes + feedback notes go here with a timestamp and a suggestion:
 - 2026-05-12 00:00: Initial draft.
 - 2026-05-13 00:00: Removed `## Report First` from bucket template — duplicates Execution Protocol steps 5–6 in workstream, which is already always read. Added note to omit `## Do-not-read` when empty. Added touchpoint rule: do not add `AGENTS.md` as required touchpoint in file-creation-only buckets.
 - 2026-05-13 17:00: Changed timestamp format to `YYYY-MM-DD HH:MM` throughout templates for ordering clarity.
+- 2026-05-13 18:00: Added `## Estimate` field to workstream template. Must be implementation cost (reads + edits + tests + iteration), not the cost of generating the workstream plan itself.
+- 2026-05-13: Resolver touchpoints — when a bucket's goal is action-generation-only (fix lives entirely in `generate_actions` or a helper), resolver touchpoints should be `Conditional` (read only if the fix might affect resolution) not `Required`. Required resolver reads are only warranted when the bucket explicitly changes resolution logic.

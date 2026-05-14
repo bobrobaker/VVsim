@@ -1,0 +1,18 @@
+{
+  "task_id": "t-badjson",
+  "worktree_path": "/tmp/pytest-of-bolun/pytest-22/test_real_codex_non_json_outpu0/.agents/worktrees/t-badjson",
+  "base_commit": "abc123def456",
+  "dry_run": false,
+  "result": {
+    "task_id": "t-badjson",
+    "status": "failed",
+    "summary": "Codex output was not valid JSON",
+    "issues": [
+      "Expecting value: line 1 column 1 (char 0)",
+      "not json\n"
+    ],
+    "completed_at": "2026-05-13T08:42:53.507655+00:00",
+    "metadata": {}
+  },
+  "run_at": "2026-05-13T08:42:53.507672+00:00"
+}

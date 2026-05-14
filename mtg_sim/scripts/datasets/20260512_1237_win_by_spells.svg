@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+<style>
+text { font-family: Arial, sans-serif; fill: #1f2933; }
+.title { font-size: 22px; font-weight: 700; }
+.label { font-size: 14px; }
+.tick { font-size: 12px; fill: #52606d; }
+.grid { stroke: #d9e2ec; stroke-width: 1; }
+.axis { stroke: #334e68; stroke-width: 1.5; }
+.line { fill: none; stroke: #0b7285; stroke-width: 3; }
+.dot { fill: #0b7285; }
+</style>
+<rect x="0" y="0" width="900" height="560" fill="#ffffff"/>
+<text class="title" x="72" y="32">Eventual Win Rate by Noncreature Spells Cast (10000 runs)</text>
+<line class="grid" x1="72" y1="488.0" x2="872" y2="488.0"/>
+<text class="tick" x="60" y="492.0" text-anchor="end">0%</text>
+<line class="grid" x1="72" y1="379.0" x2="872" y2="379.0"/>
+<text class="tick" x="60" y="383.0" text-anchor="end">25%</text>
+<line class="grid" x1="72" y1="270.0" x2="872" y2="270.0"/>
+<text class="tick" x="60" y="274.0" text-anchor="end">50%</text>
+<line class="grid" x1="72" y1="161.0" x2="872" y2="161.0"/>
+<text class="tick" x="60" y="165.0" text-anchor="end">75%</text>
+<line class="grid" x1="72" y1="52.0" x2="872" y2="52.0"/>
+<text class="tick" x="60" y="56.0" text-anchor="end">100%</text>
+<line class="grid" x1="72.0" y1="52" x2="72.0" y2="488"/>
+<text class="tick" x="72.0" y="510" text-anchor="middle">0</text>
+<line class="grid" x1="172.0" y1="52" x2="172.0" y2="488"/>
+<text class="tick" x="172.0" y="510" text-anchor="middle">5</text>
+<line class="grid" x1="272.0" y1="52" x2="272.0" y2="488"/>
+<text class="tick" x="272.0" y="510" text-anchor="middle">10</text>
+<line class="grid" x1="372.0" y1="52" x2="372.0" y2="488"/>
+<text class="tick" x="372.0" y="510" text-anchor="middle">15</text>
+<line class="grid" x1="472.0" y1="52" x2="472.0" y2="488"/>
+<text class="tick" x="472.0" y="510" text-anchor="middle">20</text>
+<line class="grid" x1="572.0" y1="52" x2="572.0" y2="488"/>
+<text class="tick" x="572.0" y="510" text-anchor="middle">25</text>
+<line class="grid" x1="672.0" y1="52" x2="672.0" y2="488"/>
+<text class="tick" x="672.0" y="510" text-anchor="middle">30</text>
+<line class="grid" x1="772.0" y1="52" x2="772.0" y2="488"/>
+<text class="tick" x="772.0" y="510" text-anchor="middle">35</text>
+<line class="grid" x1="872.0" y1="52" x2="872.0" y2="488"/>
+<text class="tick" x="872.0" y="510" text-anchor="middle">40</text>
+<line class="axis" x1="72" y1="488" x2="872" y2="488"/>
+<line class="axis" x1="72" y1="52" x2="72" y2="488"/>
+<polyline class="line" points="72.0,363.7 92.0,307.8 112.0,272.2 132.0,244.3 152.0,222.3 172.0,203.6 192.0,186.3 212.0,172.3 232.0,159.6 252.0,150.6 272.0,142.6 292.0,135.0 312.0,129.8 332.0,124.1 352.0,118.7 372.0,113.5 392.0,111.0 412.0,108.9 432.0,107.6 452.0,104.6 472.0,103.2 492.0,100.9 512.0,99.3 532.0,97.1 552.0,96.9 572.0,95.8 592.0,95.9 612.0,95.3 632.0,97.1 652.0,98.6 672.0,102.6 692.0,103.2 712.0,98.7 732.0,99.6 752.0,95.6 772.0,91.1 792.0,83.8 812.0,76.6 832.0,63.7 852.0,56.5 872.0,52.0"/>
+<circle class="dot" cx="72.0" cy="363.7" r="3"><title>0 spells: 28.5% (2852/10000)</title></circle>
+<circle class="dot" cx="92.0" cy="307.8" r="3"><title>1 spells: 41.3% (2852/6901)</title></circle>
+<circle class="dot" cx="112.0" cy="272.2" r="3"><title>2 spells: 49.5% (2852/5763)</title></circle>
+<circle class="dot" cx="132.0" cy="244.3" r="3"><title>3 spells: 55.9% (2850/5099)</title></circle>
+<circle class="dot" cx="152.0" cy="222.3" r="3"><title>4 spells: 61.0% (2819/4625)</title></circle>
+<circle class="dot" cx="172.0" cy="203.6" r="3"><title>5 spells: 65.2% (2757/4227)</title></circle>
+<circle class="dot" cx="192.0" cy="186.3" r="3"><title>6 spells: 69.2% (2683/3877)</title></circle>
+<circle class="dot" cx="212.0" cy="172.3" r="3"><title>7 spells: 72.4% (2597/3587)</title></circle>
+<circle class="dot" cx="232.0" cy="159.6" r="3"><title>8 spells: 75.3% (2484/3298)</title></circle>
+<circle class="dot" cx="252.0" cy="150.6" r="3"><title>9 spells: 77.4% (2375/3069)</title></circle>
+<circle class="dot" cx="272.0" cy="142.6" r="3"><title>10 spells: 79.2% (2237/2824)</title></circle>
+<circle class="dot" cx="292.0" cy="135.0" r="3"><title>11 spells: 81.0% (2117/2615)</title></circle>
+<circle class="dot" cx="312.0" cy="129.8" r="3"><title>12 spells: 82.2% (1980/2410)</title></circle>
+<circle class="dot" cx="332.0" cy="124.1" r="3"><title>13 spells: 83.5% (1862/2231)</title></circle>
+<circle class="dot" cx="352.0" cy="118.7" r="3"><title>14 spells: 84.7% (1738/2052)</title></circle>
+<circle class="dot" cx="372.0" cy="113.5" r="3"><title>15 spells: 85.9% (1626/1893)</title></circle>
+<circle class="dot" cx="392.0" cy="111.0" r="3"><title>16 spells: 86.5% (1515/1752)</title></circle>
+<circle class="dot" cx="412.0" cy="108.9" r="3"><title>17 spells: 86.9% (1405/1616)</title></circle>
+<circle class="dot" cx="432.0" cy="107.6" r="3"><title>18 spells: 87.3% (1294/1483)</title></circle>
+<circle class="dot" cx="452.0" cy="104.6" r="3"><title>19 spells: 87.9% (1202/1367)</title></circle>
+<circle class="dot" cx="472.0" cy="103.2" r="3"><title>20 spells: 88.3% (1113/1261)</title></circle>
+<circle class="dot" cx="492.0" cy="100.9" r="3"><title>21 spells: 88.8% (1046/1178)</title></circle>
+<circle class="dot" cx="512.0" cy="99.3" r="3"><title>22 spells: 89.2% (954/1070)</title></circle>
+<circle class="dot" cx="532.0" cy="97.1" r="3"><title>23 spells: 89.7% (885/987)</title></circle>
+<circle class="dot" cx="552.0" cy="96.9" r="3"><title>24 spells: 89.7% (819/913)</title></circle>
+<circle class="dot" cx="572.0" cy="95.8" r="3"><title>25 spells: 90.0% (761/846)</title></circle>
+<circle class="dot" cx="592.0" cy="95.9" r="3"><title>26 spells: 89.9% (687/764)</title></circle>
+<circle class="dot" cx="612.0" cy="95.3" r="3"><title>27 spells: 90.1% (635/705)</title></circle>
+<circle class="dot" cx="632.0" cy="97.1" r="3"><title>28 spells: 89.6% (589/657)</title></circle>
+<circle class="dot" cx="652.0" cy="98.6" r="3"><title>29 spells: 89.3% (552/618)</title></circle>
+<circle class="dot" cx="672.0" cy="102.6" r="3"><title>30 spells: 88.4% (495/560)</title></circle>
+<circle class="dot" cx="692.0" cy="103.2" r="3"><title>31 spells: 88.3% (466/528)</title></circle>
+<circle class="dot" cx="712.0" cy="98.7" r="3"><title>32 spells: 89.3% (433/485)</title></circle>
+<circle class="dot" cx="732.0" cy="99.6" r="3"><title>33 spells: 89.1% (392/440)</title></circle>
+<circle class="dot" cx="752.0" cy="95.6" r="3"><title>34 spells: 90.0% (369/410)</title></circle>
+<circle class="dot" cx="772.0" cy="91.1" r="3"><title>35 spells: 91.0% (345/379)</title></circle>
+<circle class="dot" cx="792.0" cy="83.8" r="3"><title>36 spells: 92.7% (318/343)</title></circle>
+<circle class="dot" cx="812.0" cy="76.6" r="3"><title>37 spells: 94.4% (301/319)</title></circle>
+<circle class="dot" cx="832.0" cy="63.7" r="3"><title>38 spells: 97.3% (291/299)</title></circle>
+<circle class="dot" cx="852.0" cy="56.5" r="3"><title>39 spells: 99.0% (286/289)</title></circle>
+<circle class="dot" cx="872.0" cy="52.0" r="3"><title>40 spells: 100.0% (282/282)</title></circle>
+<text class="label" x="472.0" y="538" text-anchor="middle">Noncreature spells cast so far</text>
+<text class="label" x="20" y="270.0" text-anchor="middle" transform="rotate(-90 20 270.0)">Eventual win rate</text>
+</svg>

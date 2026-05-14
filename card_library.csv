@@ -97,5 +97,5 @@ card_id,name,mana_cost,mv,colors,pip_u,pip_r,generic_mana,pip_ur_hybrid,x_in_cos
 96,Virtue of Courage / Embereth Blaze,{3}{R}{R},5,R,0,2,3,0,false,Enchantment,true,false,,none,,adventure:Embereth_Blaze_1R,false,none,none,,none,,false,false,false,false,false,false
 97,Volcanic Island,,0,,0,0,0,0,false,Land,false,true,false,choice,,,true,land,UR,1,repeatable,,true,false,false,false,false,false
 98,Warrior's Oath,{R}{R},2,R,0,2,0,0,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false,false
-99,Wild Ride,{R},1,R,0,1,0,0,false,Instant,true,false,,none,,alt:harmonize_4R_from_graveyard_tap_up_to_one_creature,false,none,none,,none,,false,false,false,false,false,false
+99,Wild Ride,{R},1,R,0,1,0,0,false,Sorcery,true,false,,none,,alt:harmonize_4R_from_graveyard_tap_up_to_one_creature,false,none,none,,none,,false,false,false,false,false,false
 100,Wooded Foothills,,0,,0,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_forest_or_mountain;deck_fetchable_colors_UR,true,true,false,false,false,false

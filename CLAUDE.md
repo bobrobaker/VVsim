@@ -9,7 +9,7 @@ Goal: simulate whether a starting state can chain enough spells to "Win"
 All tests: `python3 -m pytest mtg_sim/tests/ -q`
 All tests, suppress known warnings: `python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning`
 One test: `python3 -m pytest mtg_sim/tests/<test_file>.py -v`
-Single trace: `python3 -m mtg_sim.scripts.run_single --mana-u 1 --mana-r 1 --seed $RANODM`
+Single trace: `python3 -m mtg_sim.scripts.run_single --mana-u 1 --mana-r 1 --seed $RANDOM`
 Monte Carlo: `python3 -m mtg_sim.scripts.run_monte_carlo --runs 1000 --mana-u 1`
 
 ## Core architecture
@@ -40,6 +40,10 @@ Key files:
 - Card behavior owns card-specific action generation and resolution.
 - Use readable names in traces/manual mode, not object IDs.
 
+## Implementation workflow
+
+Before implementing any behavior change: write a test that fails for the right reason, then implement, then confirm the test passes.
+
 ## Context hygiene
 
 - Use grep for symbol, field, registry, constant, and call-site checks before reading code.
@@ -52,13 +56,12 @@ Key files:
 - When starting a chunk, provide line anchors for touchpoints when possible to skip exploration.
 - After each focused task, run the smallest relevant test first, then broader tests only if needed.
 - For broad pytest runs, suppress known noisy warnings unless investigating warnings.
-- CompanionDocs: before editing any `mtg_sim/` file, `.claude/rules/sim-notes.md` auto-loads a matching `docs/notes/` file with Touchpoints and Gotchas.
-- Testing rules are in `.claude/rules/tests.md` (auto-loaded for `mtg_sim/tests/**`).
+- CompanionDocs: before editing any `mtg_sim/` file, `.claude/rules/sim-notes.md` auto-loads a matching `docs/notes/` file with Touchpoints and Gotchas. Testing rules are in `.claude/rules/tests.md` (auto-loaded for `mtg_sim/tests/**`).
 - When routing a gotcha or touchpoint to a CompanionDoc for a source file outside `mtg_sim/`, also create or update a `.claude/rules/<area>-notes.md` with a `globs:` pattern covering that file's directory, so the CompanionDoc is auto-loaded in future sessions. A gotcha routed only to a CompanionDoc with no triggering rule is effectively invisible.
 
 ## Card-specific implementation direction
 
-See `docs/workstreams/card_specific.md` for the full bucket workflow.
+See `docs/workstreams/card_specific/card_specific.md` for the full bucket workflow.
 
 - Prefer card-specific logic in `card_behaviors.py`.
 - Keep `action_generator.py` as generic scaffolding where practical.
@@ -99,16 +102,10 @@ These constrain current architectural decisions:
 
 Roadmap: `docs/road.md`
 
-Workstream routing: when asked to do a "workstream" or "workflow" task (e.g. "do the next bucket"), list `docs/workstreams/` folder names first (`ls docs/workstreams/`) to find the matching workstream directory, then read `workstream.md` inside it. Do not read `docs/road.md` to find the workstream path.
-
-Read protocol:
-- Planning sessions: read current phase + immediate next work. Implementation sessions: read only the named phase/workstream if needed.
+Workstream routing: when asked to do a "workstream" or "bucket" task (e.g. "do the next bucket"), list `docs/workstreams/` folder names first (`ls docs/workstreams/`) to find the matching workstream directory, then read `workstream.md` inside it. Do not read `docs/road.md` to find the workstream path.
 
 Efficient reading:
 - Find active phase: `grep -n "Ongoing phase" docs/road.md`
 - List phase headings: `grep -n "^### Phase" docs/road.md`
 - Read one phase by heading, not line numbers from old prompts.
-- If anchors exist, prefer:
-  - `ROADMAP:PHASE-N:START`
-  - `ROADMAP:PHASE-N:END`
-- For near-term priorities: read `## 3. Immediate next work`.
+- For near-term priorities: read `## 3. Current phase detail`.

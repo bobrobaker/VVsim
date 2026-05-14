@@ -1,0 +1,19 @@
+{
+  "task_id": "t-fail",
+  "worktree_path": "/tmp/pytest-of-bolun/pytest-22/test_real_codex_path_failure0/.agents/worktrees/t-fail",
+  "base_commit": "abc123def456",
+  "dry_run": false,
+  "result": {
+    "task_id": "t-fail",
+    "status": "failed",
+    "summary": "Codex exited with code 1",
+    "issues": [
+      "error output"
+    ],
+    "completed_at": "2026-05-13T08:42:53.451063+00:00",
+    "metadata": {
+      "exit_code": 1
+    }
+  },
+  "run_at": "2026-05-13T08:42:53.451079+00:00"
+}

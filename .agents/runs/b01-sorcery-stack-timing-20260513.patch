@@ -1,0 +1,44 @@
+diff --git a/card_library.csv b/card_library.csv
+index d887563..f2e2c6f 100644
+--- a/card_library.csv
++++ b/card_library.csv
+@@ -97,5 +97,5 @@ card_id,name,mana_cost,mv,colors,pip_u,pip_r,generic_mana,pip_ur_hybrid,x_in_cos
+ 96,Virtue of Courage / Embereth Blaze,{3}{R}{R},5,R,0,2,3,0,false,Enchantment,true,false,,none,,adventure:Embereth_Blaze_1R,false,none,none,,none,,false,false,false,false,false,false
+ 97,Volcanic Island,,0,,0,0,0,0,false,Land,false,true,false,choice,,,true,land,UR,1,repeatable,,true,false,false,false,false,false
+ 98,Warrior's Oath,{R}{R},2,R,0,2,0,0,false,Sorcery,true,false,,none,,,false,none,none,,none,,false,false,false,false,false,false
+-99,Wild Ride,{R},1,R,0,1,0,0,false,Instant,true,false,,none,,alt:harmonize_4R_from_graveyard_tap_up_to_one_creature,false,none,none,,none,,false,false,false,false,false,false
++99,Wild Ride,{R},1,R,0,1,0,0,false,Sorcery,true,false,,none,,alt:harmonize_4R_from_graveyard_tap_up_to_one_creature,false,none,none,,none,,false,false,false,false,false,false
+ 100,Wooded Foothills,,0,,0,0,0,0,false,Land,false,true,false,fetch,,,true,land,UR,1,one_shot,fetches_forest_or_mountain;deck_fetchable_colors_UR,true,true,false,false,false,false
+diff --git a/mtg_sim/tests/test_misc_spells.py b/mtg_sim/tests/test_misc_spells.py
+index 6c07c5e..464d002 100644
+--- a/mtg_sim/tests/test_misc_spells.py
++++ b/mtg_sim/tests/test_misc_spells.py
+@@ -222,6 +222,28 @@ def test_boomerang_basics_sorcery_speed_only():
+     assert len(acts) == 0, "Boomerang Basics should not be castable while stack is nonempty"
+ 
+ 
++def test_wild_ride_not_castable_with_stack_nonempty():
++    from mtg_sim.sim.stack import StackObject
++    state = _state(["Wild Ride"], ManaPool(R=1))
++    state.stack.append(StackObject(card_name="Mishra's Bauble"))
++    actions = generate_actions(state)
++    acts = [
++        a for a in actions
++        if a.source_card == "Wild Ride" and a.action_type == CAST_SPELL
++    ]
++    assert len(acts) == 0, "Wild Ride should not be castable while stack is nonempty"
++
++
++def test_wild_ride_castable_with_empty_stack():
++    state = _state(["Wild Ride"], ManaPool(R=1))
++    actions = generate_actions(state)
++    acts = [
++        a for a in actions
++        if a.source_card == "Wild Ride" and a.action_type == CAST_SPELL
++    ]
++    assert len(acts) >= 1, "Wild Ride should be castable with an empty stack"
++
++
+ def test_boomerang_basics_bounces_own_permanent():
+     state = _state(["Boomerang Basics"], ManaPool(U=1))
+     perm = Permanent(card_name="Mishra's Bauble")

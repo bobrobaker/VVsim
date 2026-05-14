@@ -238,7 +238,46 @@ def test_real_codex_no_result_file(git_repo, tasks_path, tmp_path):
 
 # ---------------------------------------------------------------------------
 # Editing codex — makes a real commit so diff/patch are non-empty
+# (Tests that git diff <base> -- also captures committed changes.)
 # ---------------------------------------------------------------------------
+
+@pytest.fixture
+def uncommitted_codex(tmp_path):
+    """Fake codex that modifies a tracked file in the worktree WITHOUT staging or committing.
+
+    Simulates real codex exec (-s workspace-write) behaviour: edits land in the working
+    tree only.  README.md is guaranteed to exist in the worktree (seeded by git_repo).
+    """
+    result = {
+        "task_id": "t-uncommitted",
+        "status": "success",
+        "summary": "modified README.md without committing",
+        "files_changed": ["README.md"],
+        "validation_results": [],
+        "issues": [],
+        "proposed_followup_tasks": [],
+        "completed_at": "2026-01-01T00:00:00+00:00",
+    }
+    script = tmp_path / "uncommitted_codex"
+    script.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys, json\n"
+        "args = sys.argv[1:]\n"
+        "output_file = None\n"
+        "i = 0\n"
+        "while i < len(args):\n"
+        "    if args[i] == '-o' and i + 1 < len(args):\n"
+        "        output_file = args[i + 1]; i += 2\n"
+        "    else:\n"
+        "        i += 1\n"
+        "open('README.md', 'w').write('codex modified this\\n')\n"
+        f"result = {json.dumps(result)}\n"
+        "if output_file:\n"
+        "    open(output_file, 'w').write(json.dumps(result))\n"
+    )
+    script.chmod(0o755)
+    return str(script)
+
 
 @pytest.fixture
 def editing_codex(tmp_path):
@@ -329,6 +368,56 @@ def test_changed_files_actual_matches_diff(git_repo, tasks_path, editing_codex):
     meta = read_run_metadata("t-edit", runs_dir=runs_dir)
     assert "codex_output.txt" in meta["changed_files_actual"]
     assert meta["files_changed_mismatch"] is False
+
+
+# ---------------------------------------------------------------------------
+# Uncommitted worktree edits — core scenario for real codex exec
+# ---------------------------------------------------------------------------
+
+def test_diff_nonempty_for_uncommitted_edit(git_repo, tasks_path, uncommitted_codex):
+    _seed_task(tasks_path, _task(task_id="t-uncommitted", base_commit=""))
+    run("t-uncommitted", dry_run=False, codex_bin=uncommitted_codex,
+        repo_root=git_repo, tasks_path=tasks_path)
+    diff = git_repo / ".agents" / "runs" / "t-uncommitted.diff"
+    assert diff.exists()
+    assert "README.md" in diff.read_text()
+
+
+def test_patch_nonempty_for_uncommitted_edit(git_repo, tasks_path, uncommitted_codex):
+    _seed_task(tasks_path, _task(task_id="t-uncommitted", base_commit=""))
+    run("t-uncommitted", dry_run=False, codex_bin=uncommitted_codex,
+        repo_root=git_repo, tasks_path=tasks_path)
+    patch = git_repo / ".agents" / "runs" / "t-uncommitted.patch"
+    assert patch.exists()
+    assert patch.read_text().strip() != ""
+
+
+def test_changed_files_captured_for_uncommitted_edit(git_repo, tasks_path, uncommitted_codex):
+    runs_dir = git_repo / ".agents" / "runs"
+    _seed_task(tasks_path, _task(task_id="t-uncommitted", base_commit=""))
+    run("t-uncommitted", dry_run=False, codex_bin=uncommitted_codex,
+        repo_root=git_repo, tasks_path=tasks_path)
+    meta = read_run_metadata("t-uncommitted", runs_dir=runs_dir)
+    assert "README.md" in meta["changed_files_actual"]
+
+
+def test_apply_uncommitted_patch_changes_main_checkout(git_repo, tasks_path, uncommitted_codex, tmp_path):
+    """End-to-end: uncommitted Codex edit → patch captured → apply → main checkout file changes."""
+    from scripts.agents.apply_codex_patch import apply as apply_patch
+
+    runs_dir = git_repo / ".agents" / "runs"
+    cfg = tmp_path / "config.toml"
+    cfg.write_text('[review]\ncodex_result_review = "always"\n[patch]\nbase_commit_policy = "warn"\n')
+
+    _seed_task(tasks_path, _task(task_id="t-uncommitted", base_commit=""))
+    run("t-uncommitted", dry_run=False, codex_bin=uncommitted_codex,
+        repo_root=git_repo, tasks_path=tasks_path)
+
+    result = apply_patch("t-uncommitted", force=True, repo_root=git_repo,
+                         tasks_path=tasks_path, runs_dir=runs_dir, config_path=cfg)
+
+    assert result["status"] == "applied", result.get("error")
+    assert (git_repo / "README.md").read_text() == "codex modified this\n"
 
 
 def test_files_changed_mismatch_flagged(git_repo, tasks_path, tmp_path):

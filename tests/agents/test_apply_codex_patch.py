@@ -163,12 +163,13 @@ def test_apply_missing_run_meta_raises(git_repo, tasks_path, runs_dir, config_pa
               runs_dir=runs_dir, config_path=config_path)
 
 
-def test_apply_missing_patch_file_raises(git_repo, tasks_path, runs_dir, config_path):
+def test_apply_missing_patch_file_returns_failed(git_repo, tasks_path, runs_dir, config_path):
     _seed_task(tasks_path)
     _seed_run_meta(runs_dir, "t-001", runs_dir / "nonexistent.patch")
-    with pytest.raises(FileNotFoundError, match="Patch file"):
-        apply("t-001", force=True, repo_root=git_repo, tasks_path=tasks_path,
-              runs_dir=runs_dir, config_path=config_path)
+    result = apply("t-001", force=True, repo_root=git_repo, tasks_path=tasks_path,
+                   runs_dir=runs_dir, config_path=config_path)
+    assert result["status"] == "failed"
+    assert "missing" in result["error"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -252,3 +253,35 @@ def test_apply_validation_success(git_repo, tasks_path, runs_dir, config_path):
 
     assert result["status"] == "applied"
     assert result["validation_results"][0]["returncode"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Empty-patch handling
+# ---------------------------------------------------------------------------
+
+def test_apply_empty_patch_fails_for_implementation_task(git_repo, tasks_path, runs_dir, config_path):
+    patch_path = runs_dir / "t-001.patch"
+    patch_path.write_text("")
+    _seed_task(tasks_path)
+    _seed_run_meta(runs_dir, "t-001", patch_path)
+
+    result = apply("t-001", force=True, repo_root=git_repo, tasks_path=tasks_path,
+                   runs_dir=runs_dir, config_path=config_path)
+
+    assert result["status"] == "failed"
+    assert "Empty patch" in result["error"]
+    assert get_task("t-001", path=tasks_path)["status"] == "failed"
+
+
+def test_apply_empty_patch_allowed_for_scout_task(git_repo, tasks_path, runs_dir, config_path):
+    patch_path = runs_dir / "t-001.patch"
+    patch_path.write_text("")
+    _seed_task(tasks_path, metadata={"read_only": True})
+    _seed_run_meta(runs_dir, "t-001", patch_path)
+
+    result = apply("t-001", force=True, repo_root=git_repo, tasks_path=tasks_path,
+                   runs_dir=runs_dir, config_path=config_path)
+
+    assert result["status"] == "applied"
+    assert "scout" in result["note"]
+    assert get_task("t-001", path=tasks_path)["status"] == "applied"

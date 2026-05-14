@@ -1,0 +1,48 @@
+{
+  "task_id": "scout-castable-20260513-001",
+  "worktree_path": ".agents/worktrees/scout-castable-20260513-001",
+  "base_commit": "bd5ec6e2430120c0ccde291283b2a2bc6ed115d0",
+  "dry_run": false,
+  "result": {
+    "task_id": "scout-castable-20260513-001",
+    "status": "success",
+    "summary": "Read-only scout completed against build_active_deck() default IDs 2-100. Checked 99 cards: 26 produced at least one CAST_SPELL action, 73 did not, and there were no per-card errors. Scout result JSON is included in validation_results stdout.",
+    "files_changed": [],
+    "validation_results": [
+      {
+        "command": "python3 - <<'PY' ... read-only generate_actions scout ... PY",
+        "exit_code": 0,
+        "stdout": "{\"total_cards_checked\":99,\"castable_count\":26,\"not_castable_count\":73,\"castable_cards\":[{\"card_name\":\"Chrome Mox\",\"cast_actions\":[\"Cast Chrome Mox\"]},{\"card_name\":\"Crowd's Favor\",\"cast_actions\":[\"Cast Crowd's Favor targeting [opponent dummy creature]\"]},{\"card_name\":\"Gamble\",\"cast_actions\":[\"Cast Gamble\"]},{\"card_name\":\"Gitaxian Probe\",\"cast_actions\":[\"Cast Gitaxian Probe\"]},{\"card_name\":\"Gut Shot\",\"cast_actions\":[\"Cast Gut Shot targeting [opponent dummy creature]\",\"Cast Gut Shot (pay life) targeting [opponent dummy creature]\"]},{\"card_name\":\"Invert / Invent\",\"cast_actions\":[\"Cast Invert / Invent\"]},{\"card_name\":\"Jeweled Amulet\",\"cast_actions\":[\"Cast Jeweled Amulet\"]},{\"card_name\":\"Lion's Eye Diamond\",\"cast_actions\":[\"Cast Lion's Eye Diamond\"]},{\"card_name\":\"Lodestone Bauble\",\"cast_actions\":[\"Cast Lodestone Bauble\"]},{\"card_name\":\"Lotus Petal\",\"cast_actions\":[\"Cast Lotus Petal\"]},{\"card_name\":\"Mana Vault\",\"cast_actions\":[\"Cast Mana Vault\"]},{\"card_name\":\"Mishra's Bauble\",\"cast_actions\":[\"Cast Mishra's Bauble\"]},{\"card_name\":\"Mogg Salvage\",\"cast_actions\":[\"Cast Mogg Salvage for free targeting [opponent dummy artifact]\"]},{\"card_name\":\"Mox Amber\",\"cast_actions\":[\"Cast Mox Amber\"]},{\"card_name\":\"Mox Diamond\",\"cast_actions\":[\"Cast Mox Diamond\"]},{\"card_name\":\"Mox Opal\",\"cast_actions\":[\"Cast Mox Opal\"]},{\"card_name\":\"Paradise Mantle\",\"cast_actions\":[\"Cast Paradise Mantle\"]},{\"card_name\":\"Ragavan, Nimble Pilferer\",\"cast_actions\":[\"Cast Ragavan, Nimble Pilferer\"]},{\"card_name\":\"Rite of Flame\",\"cast_actions\":[\"Cast Rite of Flame\"]},{\"card_name\":\"Sol Ring\",\"cast_actions\":[\"Cast Sol Ring\"]},{\"card_name\":\"Springleaf Drum\",\"cast_actions\":[\"Cast Springleaf Drum\"]},{\"card_name\":\"Strike It Rich\",\"cast_actions\":[\"Cast Strike It Rich\"]},{\"card_name\":\"Thunderclap\",\"cast_actions\":[\"Cast Thunderclap (sac Mountain) targeting [opponent dummy creature]\"]},{\"card_name\":\"Urza's Bauble\",\"cast_actions\":[\"Cast Urza's Bauble\"]},{\"card_name\":\"Vexing Bauble\",\"cast_actions\":[\"Cast Vexing Bauble\"]},{\"card_name\":\"Wild Ride\",\"cast_actions\":[\"Cast Wild Ride\"]}],\"not_castable_cards\":[\"Alchemist's Gambit\",\"An Offer You Can't Refuse\",\"Ancient Tomb\",\"Arid Mesa\",\"Blazing Shoal\",\"Bloodstained Mire\",\"Boomerang Basics\",\"Cave-In\",\"Cavern of Souls\",\"Chain of Vapor\",\"Commandeer\",\"Curiosity\",\"Daze\",\"Deflecting Swat\",\"Disrupting Shoal\",\"Dizzy Spell\",\"Drift of Phantasms\",\"Fierce Guardianship\",\"Fiery Islet\",\"Final Fortune\",\"Flooded Strand\",\"Flusterstorm\",\"Force of Will\",\"Gemstone Caverns\",\"Grim Monolith\",\"Hullbreaker Horror\",\"Hydroelectric Specimen / Hydroelectric Laboratory\",\"Imperial Recruiter\",\"Intuition\",\"Island\",\"Jeska's Will\",\"Last Chance\",\"Mental Misstep\",\"Merchant Scroll\",\"Misdirection\",\"Misty Rainforest\",\"Mountain\",\"Multiversal Passage\",\"Mystic Remora\",\"Mystical Tutor\",\"Niv-Mizzet, Visionary\",\"Ophidian Eye\",\"Pact of Negation\",\"Pinnacle Monk / Mystic Peak\",\"Polluted Delta\",\"Prismatic Vista\",\"Pyroblast\",\"Pyrokinesis\",\"Quicksilver Elemental\",\"Redirect Lightning\",\"Repeal\",\"Rhystic Study\",\"Sandstone Needle\",\"Saprazzan Skerry\",\"Scalding Tarn\",\"Sea Gate Restoration / Sea Gate, Reborn\",\"Secret Identity\",\"Shatterskull Smashing / Shatterskull, the Hammer Pass\",\"Simian Spirit Guide\",\"Sink into Stupor / Soporific Springs\",\"Snapback\",\"Solve the Equation\",\"Steam Vents\",\"Sundering Eruption / Volcanic Fissure\",\"Swan Song\",\"Tandem Lookout\",\"Thran Portal\",\"Thundering Falls\",\"Twisted Image\",\"Virtue of Courage / Embereth Blaze\",\"Volcanic Island\",\"Warrior's Oath\",\"Wooded Foothills\"],\"ambiguous_or_errors\":[],\"assumptions\":\"Used build_active_deck() after loading card_library.csv, which defaults to card IDs 2-100. The repository Permanent dataclass accepts card_name, not card=get_card(...), so the battlefield permanent was constructed as Permanent(card_name='Volcanic Island', tapped=True). Each state used GameState defaults plus the requested hand, ManaPool(R=1), tapped Volcanic Island battlefield, Vivi/legendary/tap flags, land_play_available=False, stack=[], and pending_choices=[]. generate_actions(state) was called directly; simulate_run was not called.\"}",
+        "stderr": "UserWarning: Active deck contains cards with no registered behavior (will use generic rules only): ['Ancient Tomb', 'Island', 'Mountain', 'Ragavan, Nimble Pilferer', 'Sandstone Needle', 'Saprazzan Skerry', 'Steam Vents', 'Thundering Falls', 'Volcanic Island']"
+      },
+      {
+        "command": "git status --short",
+        "exit_code": 0,
+        "stdout": "?? .agents/handoffs/claude_to_codex/\n",
+        "stderr": null
+      }
+    ],
+    "issues": [
+      "The worktree had an existing untracked .agents/handoffs/claude_to_codex/ entry; no source or test files were modified or created by this scout."
+    ],
+    "proposed_followup_tasks": [],
+    "completed_at": "2026-05-13T19:28:49-07:00"
+  },
+  "result_path": ".agents/handoffs/codex_to_claude/result_scout-castable-20260513-001.json",
+  "diff_path": ".agents/runs/scout-castable-20260513-001.diff",
+  "patch_path": ".agents/runs/scout-castable-20260513-001.patch",
+  "changed_files_actual": [
+    ".agents/schemas/implementation_result.json",
+    ".agents/skills/codex-implementer/SKILL.md",
+    ".agents/tasks.json",
+    ".claude/skills/outsource-codex/SKILL.md",
+    "AGENTS.md",
+    "docs/workstreams/codex-subagent-refactor/buckets/B04_result-diff-patch.md",
+    "docs/workstreams/codex-subagent-refactor/how_to_use.md",
+    "scripts/agents/run_codex_task.py",
+    "tests/agents/test_run_codex_task.py",
+    "tests/agents/test_schema_strict.py"
+  ],
+  "files_changed_mismatch": true,
+  "run_at": "2026-05-14T02:29:25.979620+00:00"
+}

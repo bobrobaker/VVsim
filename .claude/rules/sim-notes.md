@@ -14,3 +14,5 @@ At the end of a session, for any source file you edited:
 For test files you edited, update Helpers and Setup pattern only. No Recent changes section. Keep the whole file under 15 lines.
 
 If no CompanionDoc exists for a file you edited and you have a meaningful update to record (new Touchpoints, a non-obvious Gotcha, or a significant Recent change), ask the user for permission before creating it. Do not create one silently.
+
+**JSONL reads:** `mtg_sim/scripts/logs/*.jsonl` entries are full JSON snapshots — one line can be 10–50 KB. Use `awk 'NR==N'` to read a specific line; `sed -n 'N,Mp'` on a range will stream the entire range as raw text and is extremely wasteful.

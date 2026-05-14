@@ -1,0 +1,32 @@
+{
+  "task_id": "b01-sorcery-stack-timing-20260513",
+  "status": "success",
+  "summary": "Updated Wild Ride's card type in card_library.csv from Instant to Sorcery so the existing sorcery-speed stack gate blocks it while the stack is nonempty. Added focused tests covering the Mishra's Bauble-on-stack reproduction state and the empty-stack castable case.",
+  "files_changed": [
+    "card_library.csv",
+    "mtg_sim/tests/test_misc_spells.py"
+  ],
+  "validation_results": [
+    {
+      "command": "python3 -m pytest mtg_sim/tests/test_misc_spells.py -k wild_ride -q -W ignore::UserWarning",
+      "exit_code": 1,
+      "stdout": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n_______________ test_wild_ride_not_castable_with_stack_nonempty ________________\n\n    def test_wild_ride_not_castable_with_stack_nonempty():\n        from mtg_sim.sim.stack import StackObject\n        state = _state([\"Wild Ride\"], ManaPool(R=1))\n        state.stack.append(StackObject(card_name=\"Mishra's Bauble\"))\n        actions = generate_actions(state)\n        acts = [\n            a for a in actions\n            if a.source_card == \"Wild Ride\" and a.action_type == CAST_SPELL\n        ]\n>       assert len(acts) == 0, \"Wild Ride should not be castable while stack is nonempty\"\nE       AssertionError: Wild Ride should not be castable while stack is nonempty\nE       assert 1 == 0\nE        +  where 1 = len([[CAST_SPELL] Cast Wild Ride])\n\nmtg_sim/tests/test_misc_spells.py:234: AssertionError\n=========================== short test summary info ============================\nFAILED mtg_sim/tests/test_misc_spells.py::test_wild_ride_not_castable_with_stack_nonempty\n1 failed, 1 passed, 47 deselected in 0.16s",
+      "stderr": null
+    },
+    {
+      "command": "python3 -m pytest mtg_sim/tests/test_misc_spells.py -k wild_ride -q -W ignore::UserWarning",
+      "exit_code": 0,
+      "stdout": "..                                                                       [100%]\n2 passed, 47 deselected in 0.04s",
+      "stderr": null
+    },
+    {
+      "command": "python3 -m pytest mtg_sim/tests/ -q -W ignore::UserWarning",
+      "exit_code": 0,
+      "stdout": "........................................................................ [ 17%]\n........................................................................ [ 34%]\n........................................................................ [ 51%]\n........................................................................ [ 68%]\n........................................................................ [ 86%]\n..........................................................               [100%]\n418 passed in 1.55s",
+      "stderr": null
+    }
+  ],
+  "issues": [],
+  "proposed_followup_tasks": [],
+  "completed_at": "2026-05-13T21:46:47-07:00"
+}

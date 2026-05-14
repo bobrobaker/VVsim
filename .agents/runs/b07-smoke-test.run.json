@@ -1,0 +1,25 @@
+{
+  "task_id": "b07-smoke-test",
+  "worktree_path": ".agents/worktrees/b07-smoke-test",
+  "base_commit": "bca98447aa68d2e4705024d3e5a51a1d40a433f9",
+  "dry_run": true,
+  "result": {
+    "task_id": "b07-smoke-test",
+    "status": "success",
+    "summary": "[dry-run] No real Codex execution. Simulated success.",
+    "files_changed": [],
+    "validation_results": [],
+    "issues": [],
+    "proposed_followup_tasks": [],
+    "completed_at": "2026-05-13T09:36:08.685455+00:00",
+    "metadata": {
+      "dry_run": true
+    }
+  },
+  "result_path": ".agents/handoffs/codex_to_claude/result_b07-smoke-test.json",
+  "diff_path": ".agents/runs/b07-smoke-test.diff",
+  "patch_path": ".agents/runs/b07-smoke-test.patch",
+  "changed_files_actual": [],
+  "files_changed_mismatch": false,
+  "run_at": "2026-05-13T09:36:08.694590+00:00"
+}

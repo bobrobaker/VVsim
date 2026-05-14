@@ -178,7 +178,13 @@ def apply(
     raw_patch = run_meta.get("patch_path") or run_meta.get("artifacts", {}).get("patch_path", "")
     patch_path = Path(raw_patch)
     if not patch_path.exists():
-        raise FileNotFoundError(f"Patch file not found: {patch_path}")
+        update_task_status(task_id, "failed", path=tasks_path)
+        return {
+            "task_id": task_id,
+            "status": "failed",
+            "validation_results": [],
+            "error": f"Patch file missing: {patch_path}",
+        }
 
     # Review policy gate
     review_pol = _review_policy(cfg)
@@ -189,10 +195,31 @@ def apply(
     base_pol = _base_commit_policy(cfg)
     _check_base_commit(task, repo_root, base_pol)
 
-    # Empty patch means no changes; skip apply
-    if patch_path.stat().st_size == 0:
-        update_task_status(task_id, "applied", path=tasks_path)
-        return {"task_id": task_id, "status": "applied", "validation_results": [], "error": None, "note": "empty patch, nothing to apply"}
+    # Empty patch: scout/read-only tasks legitimately produce no edits; implementation
+    # tasks must produce a patch or something went wrong (harness bug, Codex no-op).
+    patch_empty = not patch_path.read_text(encoding="utf-8", errors="replace").strip()
+    if patch_empty:
+        mode = task.get("mode", "")
+        is_read_only = (
+            mode in ("scout", "read_only")
+            or task.get("metadata", {}).get("read_only", False)
+        )
+        if is_read_only:
+            update_task_status(task_id, "applied", path=tasks_path)
+            return {
+                "task_id": task_id,
+                "status": "applied",
+                "validation_results": [],
+                "error": None,
+                "note": "scout/read-only task: empty patch expected",
+            }
+        update_task_status(task_id, "failed", path=tasks_path)
+        return {
+            "task_id": task_id,
+            "status": "failed",
+            "validation_results": [],
+            "error": "Empty patch for implementation task — Codex may have made no changes or patch capture failed",
+        }
 
     # Dry-run patch check
     _git_apply_check(patch_path, repo_root)

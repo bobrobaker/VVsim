@@ -1,0 +1,18 @@
+{
+  "task_id": "t-fake",
+  "worktree_path": "/tmp/pytest-of-bolun/pytest-22/test_real_codex_path_success0/.agents/worktrees/t-fake",
+  "base_commit": "abc123def456",
+  "dry_run": false,
+  "result": {
+    "task_id": "t-fake",
+    "status": "success",
+    "summary": "fake codex ran",
+    "files_changed": [],
+    "validation_results": [],
+    "issues": [],
+    "proposed_followup_tasks": [],
+    "completed_at": "2026-01-01T00:00:00+00:00",
+    "metadata": {}
+  },
+  "run_at": "2026-05-13T08:42:53.388274+00:00"
+}

@@ -201,8 +201,12 @@ def _run_codex(task: dict, codex_bin: str, worktree_path: Path) -> dict:
 
 
 def _capture_diff(safe_id: str, worktree_path: Path, base_commit: str, runs_dir: Path) -> Path:
+    # git diff <base_commit> -- compares the worktree to base_commit, capturing both
+    # committed and uncommitted changes. codex exec (-s workspace-write) edits files
+    # without committing, so git diff <base>..HEAD (commits only) silently produces an
+    # empty diff. The one-argument commit form uses the worktree state as the other side.
     proc = subprocess.run(
-        ["git", "diff", f"{base_commit}..HEAD"],
+        ["git", "diff", base_commit, "--"],
         cwd=worktree_path,
         capture_output=True,
         text=True,
@@ -213,8 +217,10 @@ def _capture_diff(safe_id: str, worktree_path: Path, base_commit: str, runs_dir:
 
 
 def _capture_patch(safe_id: str, worktree_path: Path, base_commit: str, runs_dir: Path) -> Path:
+    # --binary ensures binary files round-trip through git apply.
+    # Same base_commit reasoning as _capture_diff; git apply accepts unified diff output.
     proc = subprocess.run(
-        ["git", "format-patch", "--stdout", base_commit],
+        ["git", "diff", "--binary", base_commit, "--"],
         cwd=worktree_path,
         capture_output=True,
         text=True,
@@ -325,6 +331,34 @@ def run(
 
     diff_path = _capture_diff(safe_id, worktree_path, task["base_commit"], runs_dir)
     patch_path = _capture_patch(safe_id, worktree_path, task["base_commit"], runs_dir)
+
+    # Guard: if the worktree has uncommitted changes but the captured patch is empty,
+    # something went wrong in capture — fail rather than silently no-oping on apply.
+    # Checking returncode separately so a git failure doesn't mask a real patch error.
+    # HEAD is always resolvable; in the worktree it equals base_commit since Codex
+    # does not create commits, so this is equivalent to diffing against base_commit.
+    worktree_dirty_proc = subprocess.run(
+        ["git", "diff", "--name-only", "HEAD", "--"],
+        cwd=worktree_path,
+        capture_output=True,
+        text=True,
+    )
+    if worktree_dirty_proc.returncode != 0:
+        result = dict(result)
+        result["status"] = "failed"
+        result["issues"] = result.get("issues", []) + [
+            f"Harness error: failed to inspect worktree diff: {worktree_dirty_proc.stderr.strip()}"
+        ]
+    else:
+        worktree_dirty = worktree_dirty_proc.stdout.strip()
+        patch_empty = not patch_path.read_text(encoding="utf-8", errors="replace").strip()
+        if worktree_dirty and patch_empty:
+            result = dict(result)
+            result["status"] = "failed"
+            result["issues"] = result.get("issues", []) + [
+                f"Harness error: worktree has changes ({worktree_dirty!r}) but patch is empty"
+            ]
+
     result_path = _copy_result(safe_id, result, repo_root)
 
     diff_text = diff_path.read_text()

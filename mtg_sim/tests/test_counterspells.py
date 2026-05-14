@@ -523,6 +523,21 @@ def test_daze_alt_cost_returns_island():
     assert len(alt_acts) >= 1, "Daze should generate return-island alt cost action"
 
 
+def test_daze_alt_cost_tapped_island_eligible():
+    # manual_observations.jsonl:51 — Volcanic Island tapped, Daze in hand, spell on stack
+    # Returning an island for Daze does not require the island to be untapped.
+    _load()
+    state = _state_with_hand(["Daze"], ManaPool(R=1))
+    # Default battlefield has a tapped Volcanic Island; confirm Daze sees it.
+    island_ids = {p.perm_id for p in state.battlefield if p.card_name == "Volcanic Island" and p.tapped}
+    assert island_ids, "Precondition: tapped Volcanic Island must be on battlefield"
+    _push_spell(state, "Mishra's Bauble")
+    acts = generate_actions(state)
+    alt_acts = [a for a in acts if a.source_card == "Daze" and a.alt_cost_type == "return_island"]
+    assert len(alt_acts) >= 1, "Daze should allow returning a tapped Volcanic Island"
+    assert alt_acts[0].costs.tap_permanent_id in island_ids
+
+
 # ── Countered flashback spell goes to exile ───────────────────────────────────
 
 def test_countered_flashback_goes_to_exile():
