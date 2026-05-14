@@ -177,7 +177,6 @@ def fake_codex(tmp_path):
         "issues": [],
         "proposed_followup_tasks": [],
         "completed_at": "2026-01-01T00:00:00+00:00",
-        "metadata": {},
     }
     script = tmp_path / "fake_codex"
     script.write_text(
@@ -253,7 +252,6 @@ def editing_codex(tmp_path):
         "issues": [],
         "proposed_followup_tasks": [],
         "completed_at": "2026-01-01T00:00:00+00:00",
-        "metadata": {},
     }
     script = tmp_path / "editing_codex"
     script.write_text(
@@ -344,7 +342,6 @@ def test_files_changed_mismatch_flagged(git_repo, tasks_path, tmp_path):
         "issues": [],
         "proposed_followup_tasks": [],
         "completed_at": "2026-01-01T00:00:00+00:00",
-        "metadata": {},
     }
     script = tmp_path / "mismatch_codex"
     script.write_text(
