@@ -2,6 +2,35 @@
 
 Qualitative findings from past sessions. Append new entries via `/introspect`.
 
+## Route B Scout / Protocol Hardening
+
+**Session:** 2026-05-13. Ran outsource-codex scout (99 cards, 26 castable). Fixed Route B protocol: `codex exec -o` contract, OpenAI strict schema (3 fix cycles), worktree-from-HEAD propagation, SKILL.md frontmatter, preflight staleness warning. 85 agents tests pass.
+
+### Estimated token ratio
+
+~10:1 input:output. Long session — multiple Codex re-runs, 3 schema fix cycles, compacted prior-context re-ingestion, multi-file protocol sync.
+
+### What was useful
+
+- `implementation_result.json` — essential, fixed 3 times.
+- `run_codex_task.py` — core edit surface, read multiple times but all relevant.
+- `test_schema_strict.py` (created new) — high value, now prevents schema regressions.
+- `test_run_codex_task.py` — necessary for fake_codex fixture updates.
+
+### Main token drains
+
+1. **Schema fixed 3 separate times** — each commit revealed the next OpenAI strict compliance issue. A single upfront checklist (additionalProperties:false, all props in required, nullable for optional) would have collapsed 3 cycles to 1. Now self-enforcing via `test_schema_strict.py`.
+2. **5–6 Codex re-runs** — each protocol fix required: commit → run → read error → diagnose → fix. Most cycles caused by schema errors or uncommitted files not propagating to worktree.
+3. **Multi-file protocol sync** — AGENTS.md, both SKILL.md files, how_to_use.md all needed updating when write-result contract changed. Each required a separate read + edit.
+
+### Concrete recommendations
+
+- Before using `--output-schema` with any JSON schema, run `test_schema_strict.py` equivalent checks first. Now encoded in tests — self-enforcing.
+- Worktree-from-HEAD constraint is now in CompanionDoc for `run_codex_task.py` and covered by `agents-notes.md` glob rule.
+- When the write-side protocol changes (how Codex emits output), enumerate all instruction surfaces upfront (AGENTS.md, SKILL.md, outsource SKILL.md, how_to_use) before editing any of them.
+
+---
+
 ## B04 Result Diff Patch
 
 **Session:** 2026-05-13. Built diff/patch/result capture in `run_codex_task.py`, 23 tests pass (47 total). Fixed CompanionDoc rule gap.
@@ -461,3 +490,12 @@ None recurred from prior sessions.
 - Drain 2: AGENTS.md read in two halves (~160 lines) — third recurrence of this pattern. Not routeable via rules (AGENTS.md isn't under a rules-triggered glob). Routed to CLAUDE.md instead (already done).
 - Drain 3: exploratory ls/grep cascade at session start before settling on workstream directory.
 - Concrete change: CLAUDE.md now says `ls docs/workstreams/` first for workstream tasks. apply_codex_patch.py ContextNote corrected (patch_path key) and extended (empty-patch gotcha).
+
+## Reset Status CLI
+
+- Token ratio ~5:1. Short focused session: added `--reset-status` flag to `run_codex_task.py` + 3 tests.
+- Useful: targeted greps on task_queue.py + run_codex_task.py — found signature, imports, and main() structure without any full-file reads.
+- Drain 1: ToolSearch for TaskList/TaskGet schemas — 2 extra round-trips per session for tools that are used every introspect.
+- Drain 2: tail read of test file to find insertion point — grep for last `^def test` would have been lighter.
+- Drain 3: baseline auto-load (unavoidable).
+- No recurring mistakes. No routing changes needed.

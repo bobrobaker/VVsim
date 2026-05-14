@@ -362,7 +362,26 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Simulate Codex without auth")
     parser.add_argument("--codex-bin", default="codex", help="Path to Codex binary")
     parser.add_argument("--repo-root", default=".", help="Repo root (default: cwd)")
+    parser.add_argument(
+        "--reset-status",
+        metavar="STATUS",
+        help="Reset task status to STATUS and exit (no Codex run). "
+             "Valid: applied, cleaned, failed, needs_input, ready, result_ready, running",
+    )
     args = parser.parse_args()
+
+    if args.reset_status:
+        try:
+            task = update_task_status(
+                args.task_id,
+                args.reset_status,
+                path=Path(".agents/tasks.json"),
+            )
+        except (KeyError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(json.dumps({"task_id": task["task_id"], "status": task["status"]}, indent=2))
+        return
 
     try:
         result = run(

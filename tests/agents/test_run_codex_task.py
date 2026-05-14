@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from scripts.agents.run_codex_task import _safe_name, _warn_protocol_staleness, run
+from scripts.agents.run_codex_task import _safe_name, _warn_protocol_staleness, main, run
 from scripts.agents.task_queue import get_task, load_tasks, read_run_metadata
 
 
@@ -411,3 +411,65 @@ def test_dry_run_artifacts_created(git_repo, tasks_path):
     assert Path(meta["diff_path"]).exists()
     assert Path(meta["patch_path"]).exists()
     assert Path(meta["result_path"]).exists()
+
+
+# ---------------------------------------------------------------------------
+# --reset-status CLI flag
+# ---------------------------------------------------------------------------
+
+def test_reset_status_updates_task(tmp_path, monkeypatch, capsys):
+    """--reset-status rewrites the task's status and prints JSON confirmation."""
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir()
+    tp = agents_dir / "tasks.json"
+    _seed_task(tp, _task(status="running"))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["run_codex_task", "--task-id", "t-001", "--reset-status", "failed"],
+    )
+    monkeypatch.chdir(tmp_path)
+
+    main()
+
+    out = json.loads(capsys.readouterr().out)
+    assert out == {"task_id": "t-001", "status": "failed"}
+    assert get_task("t-001", path=tp)["status"] == "failed"
+
+
+def test_reset_status_invalid_status_exits(tmp_path, monkeypatch, capsys):
+    """--reset-status with an unknown status exits with code 1 and prints an error."""
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir()
+    tp = agents_dir / "tasks.json"
+    _seed_task(tp, _task(status="running"))
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["run_codex_task", "--task-id", "t-001", "--reset-status", "bogus"],
+    )
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 1
+    assert "bogus" in capsys.readouterr().err
+
+
+def test_reset_status_missing_task_exits(tmp_path, monkeypatch, capsys):
+    """--reset-status with an unknown task_id exits with code 1."""
+    agents_dir = tmp_path / ".agents"
+    agents_dir.mkdir()
+    (agents_dir / "tasks.json").write_text("[]\n")
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["run_codex_task", "--task-id", "no-such-task", "--reset-status", "ready"],
+    )
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+
+    assert exc.value.code == 1
